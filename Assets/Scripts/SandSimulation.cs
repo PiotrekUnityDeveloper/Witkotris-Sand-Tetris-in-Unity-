@@ -1427,6 +1427,7 @@ public class SandSimulation : MonoBehaviour
             {
                 Vector2Int belowCheck = new Vector2Int(localPosition.x, localPosition.y - 1);
                 Vector2Int targetChunkCheck = chunkPosition;
+                belowCheck = AdjustPositionForChunk(belowCheck, ref targetChunkCheck, currentChunk.chunkSize);
 
                 if (belowCheck.y < 0)
                 {
@@ -1491,39 +1492,82 @@ public class SandSimulation : MonoBehaviour
                     // Calculate probability based on distance
                     float spreadProbability = flowSpeed * (1f - (spread - 1) / maxSpread);
 
-                    // Try left side
-                    if (Random.value < spreadProbability)
-                    {
-                        int rnd = Random.Range(0, 2);
+                    int rnd0 = Random.Range(0, 2);
 
-                        if(rnd == 0)
+                    if(rnd0 == 1)
+                    {
+                        // Try left side
+                        if (Random.value < spreadProbability)
                         {
-                            potentialMoves.Add(new Vector2Int(current.x - spread, current.y - 1));  // Diagonal down-left
-                            potentialMoves.Add(new Vector2Int(current.x - spread, current.y));      // Straight left
+                            int rnd = Random.Range(0, 1);
+
+                            if (rnd == 0)
+                            {
+                                potentialMoves.Add(new Vector2Int(current.x - spread, current.y - 1));  // Diagonal down-left
+                                potentialMoves.Add(new Vector2Int(current.x - spread, current.y));      // Straight left
+                            }
+                            else
+                            {
+                                potentialMoves.Add(new Vector2Int(current.x - spread, current.y));      // Straight left
+                                potentialMoves.Add(new Vector2Int(current.x - spread, current.y - 1));  // Diagonal down-left
+                            }
                         }
-                        else
+
+                        // Try right side
+                        if (Random.value < spreadProbability)
                         {
-                            potentialMoves.Add(new Vector2Int(current.x - spread, current.y));      // Straight left
-                            potentialMoves.Add(new Vector2Int(current.x - spread, current.y - 1));  // Diagonal down-left
+                            int rnd = Random.Range(0, 1);
+
+                            if (rnd == 0)
+                            {
+                                potentialMoves.Add(new Vector2Int(current.x + spread, current.y - 1));  // Diagonal down-right
+                                potentialMoves.Add(new Vector2Int(current.x + spread, current.y));      // Straight right
+                            }
+                            else
+                            {
+                                potentialMoves.Add(new Vector2Int(current.x + spread, current.y));      // Straight right
+                                potentialMoves.Add(new Vector2Int(current.x + spread, current.y - 1));  // Diagonal down-right
+                            }
+                        }
+                    }
+                    else if (rnd0 == 0)
+                    {
+                        // Try right side
+                        if (Random.value < spreadProbability)
+                        {
+                            int rnd = Random.Range(0, 1);
+
+                            if (rnd == 0)
+                            {
+                                potentialMoves.Add(new Vector2Int(current.x + spread, current.y - 1));  // Diagonal down-right
+                                potentialMoves.Add(new Vector2Int(current.x + spread, current.y));      // Straight right
+                            }
+                            else
+                            {
+                                potentialMoves.Add(new Vector2Int(current.x + spread, current.y));      // Straight right
+                                potentialMoves.Add(new Vector2Int(current.x + spread, current.y - 1));  // Diagonal down-right
+                            }
+                        }
+
+                        // Try left side
+                        if (Random.value < spreadProbability)
+                        {
+                            int rnd = Random.Range(0, 1);
+
+                            if (rnd == 0)
+                            {
+                                potentialMoves.Add(new Vector2Int(current.x - spread, current.y - 1));  // Diagonal down-left
+                                potentialMoves.Add(new Vector2Int(current.x - spread, current.y));      // Straight left
+                            }
+                            else
+                            {
+                                potentialMoves.Add(new Vector2Int(current.x - spread, current.y));      // Straight left
+                                potentialMoves.Add(new Vector2Int(current.x - spread, current.y - 1));  // Diagonal down-left
+                            }
                         }
                     }
 
-                    // Try right side
-                    if (Random.value < spreadProbability)
-                    {
-                        int rnd = Random.Range(0, 1);
-
-                        if(rnd == 0)
-                        {
-                            potentialMoves.Add(new Vector2Int(current.x + spread, current.y - 1));  // Diagonal down-right
-                            potentialMoves.Add(new Vector2Int(current.x + spread, current.y));      // Straight right
-                        }
-                        else
-                        {
-                            potentialMoves.Add(new Vector2Int(current.x + spread, current.y));      // Straight right
-                            potentialMoves.Add(new Vector2Int(current.x + spread, current.y - 1));  // Diagonal down-right
-                        }
-                    }
+                    
                 }
 
                 bool moved = false;
@@ -1533,7 +1577,9 @@ public class SandSimulation : MonoBehaviour
                 {
                     Vector2Int targetChunkPos = currentChunkPos;
                     Vector2Int adjustedPos = targetPos;
+                    adjustedPos = AdjustPositionForChunk(targetPos, ref targetChunkPos, currentChunk.chunkSize);
 
+                    /*
                     // Adjust position and chunk if moving across chunk boundaries
                     if (adjustedPos.y < 0)
                     {
@@ -1549,7 +1595,7 @@ public class SandSimulation : MonoBehaviour
                     {
                         adjustedPos.x = 0;
                         targetChunkPos.x += 1;
-                    }
+                    }*/
 
                     if (SandSimulation.Instance.chunks.TryGetValue(targetChunkPos, out Chunk targetChunkObject))
                     {
@@ -1639,7 +1685,40 @@ public class SandSimulation : MonoBehaviour
                 }
             }
         }
+
+        private Vector2Int AdjustPositionForChunk(Vector2Int position, ref Vector2Int chunkPos, int chunkSize)
+        {
+            Vector2Int adjustedPos = position;
+
+            // Handle vertical boundaries
+            if (adjustedPos.y < 0)
+            {
+                adjustedPos.y = chunkSize - 1;
+                chunkPos.y -= 1;
+            }
+            else if (adjustedPos.y >= chunkSize)
+            {
+                adjustedPos.y = 0;
+                chunkPos.y += 1;
+            }
+
+            // Handle horizontal boundaries
+            if (adjustedPos.x < 0)
+            {
+                adjustedPos.x = chunkSize - 1;
+                chunkPos.x -= 1;
+            }
+            else if (adjustedPos.x >= chunkSize)
+            {
+                adjustedPos.x = 0;
+                chunkPos.x += 1;
+            }
+
+            return adjustedPos;
+        }
     }
+
+   
 
     // ELEMENTS // PARTICLES
 
