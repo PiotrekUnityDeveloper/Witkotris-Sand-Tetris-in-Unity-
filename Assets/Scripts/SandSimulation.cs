@@ -37,6 +37,7 @@ public class SandSimulation : MonoBehaviour
     public bool enableDrawing = false;
     public string selectedElement = "sand";
     [Range(0, 15)] public float drawingBrushSize = 0;
+    public bool interactionUpdatesEnvironment = true;
 
     [Header("References")]
     public SimulationRenderer simulationRenderer;
@@ -146,7 +147,7 @@ public class SandSimulation : MonoBehaviour
                 if (chunks[chunkPos].elements[localPos.x, localPos.y] == null)
                 {
                     chunks[chunkPos].AddElement(localPos, selectedElement);
-                    chunks[chunkPos].WakeUpParticleNeighbors(localPos, chunkPos);
+                    if(interactionUpdatesEnvironment) chunks[chunkPos].WakeUpParticleNeighbors(localPos, chunkPos);
                 }
             }
         }
@@ -192,8 +193,8 @@ public class SandSimulation : MonoBehaviour
                     Chunk chunk = chunks[chunkPos];
                     if (chunk.elements[localPos.x, localPos.y] != null)
                     {
-                        chunk.WakeUpParticleNeighbors(localPos, chunkPos);
-                        chunk.WakeUpAllChunkNeighbors(true);
+                        chunk.WakeUpParticleNeighbors(localPos, chunkPos); //reqiured
+                        if(interactionUpdatesEnvironment) chunk.WakeUpAllChunkNeighbors(true);
                         chunk.elements[localPos.x, localPos.y] = null;
 
                         // Check if the chunk is now empty
@@ -1252,7 +1253,7 @@ public class SandSimulation : MonoBehaviour
 
             if (lastPosition != null)
             {
-                if (GetGlobalPosition() == lastPosition)
+                if (localPosition == lastPosition)
                 {
                     isResting = true;
                 }
@@ -1493,7 +1494,7 @@ public class SandSimulation : MonoBehaviour
                     // Try left side
                     if (Random.value < spreadProbability)
                     {
-                        int rnd = Random.Range(0, 1);
+                        int rnd = Random.Range(0, 2);
 
                         if(rnd == 0)
                         {
@@ -1608,7 +1609,7 @@ public class SandSimulation : MonoBehaviour
 
             if (lastPosition != null)
             {
-                if (GetGlobalPosition() == lastPosition)
+                if (localPosition == lastPosition)
                 {
                     this.isResting = true;
                 }
