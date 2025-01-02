@@ -40,7 +40,8 @@ public class SandSimulation : MonoBehaviour
 
     [Header("References")]
     public SimulationRenderer simulationRenderer;
-    public Tilemap referenceTilemap;
+    public Tilemap collisionTilemap;
+    public Tilemap boundaryTilemap;
     [HideInInspector] public Dictionary<Vector2Int, Chunk> chunks = new Dictionary<Vector2Int, Chunk>();
 
     [Header("Debug")]
@@ -137,7 +138,7 @@ public class SandSimulation : MonoBehaviour
                     0
                 );
 
-                if (referenceTilemap.HasTile(tilePosition))
+                if (collisionTilemap.HasTile(tilePosition))
                 {
                     continue;
                 }
@@ -235,7 +236,7 @@ public class SandSimulation : MonoBehaviour
     {
         if (chunkGenerationMode == ChunkGenerationMode.TilemapOutline)
         {
-            BoundsInt bounds = referenceTilemap.cellBounds;
+            BoundsInt bounds = boundaryTilemap.cellBounds;
 
             for (int x = bounds.xMin; x < bounds.xMax; x++)
             {
@@ -247,14 +248,14 @@ public class SandSimulation : MonoBehaviour
             }
         }else if (chunkGenerationMode == ChunkGenerationMode.TilemapRooms)
         {
-            BoundsInt bounds = referenceTilemap.cellBounds;
+            BoundsInt bounds = boundaryTilemap.cellBounds;
 
             for (int x = bounds.xMin; x < bounds.xMax; x++)
             {
                 for (int y = bounds.yMin; y < bounds.yMax; y++)
                 {
                     Vector2Int chunkPosition = new Vector2Int(x, y);
-                    if(referenceTilemap.GetTile(new Vector3Int(chunkPosition.x, chunkPosition.x, (int)referenceTilemap.transform.position.z)) != null)
+                    if(boundaryTilemap.GetTile(new Vector3Int(chunkPosition.x, chunkPosition.x, 0)) != null)
                     {
                         chunks[chunkPosition] = new Chunk(chunkPosition, chunkSize);
                     }
@@ -377,7 +378,7 @@ public class SandSimulation : MonoBehaviour
                     y / neighborChunk.chunkSize + neighborPos.y,
                     0);
 
-                if (!referenceTilemap.HasTile(tilePosition) && neighborChunk.elements[x, y] == null)
+                if (!collisionTilemap.HasTile(tilePosition) && neighborChunk.elements[x, y] == null)
                 {
                     element.localPosition = new Vector2Int(x, y);
                     element.chunkPosition = neighborPos;
@@ -603,7 +604,7 @@ public class SandSimulation : MonoBehaviour
                         adjustedPos.y / chunkSize + targetChunk.y,
                         0);
 
-                    bool hasContact = SandSimulation.Instance.referenceTilemap.HasTile(tilePosition) ||
+                    bool hasContact = SandSimulation.Instance.collisionTilemap.HasTile(tilePosition) ||
                                     targetChunkObj.elements[adjustedPos.x, adjustedPos.y] != null;
 
                     if (contactPoint.y < particle.localPosition.y)
@@ -974,7 +975,7 @@ public class SandSimulation : MonoBehaviour
                     below.y / currentChunk.chunkSize + targetChunk.y,
                     0);
 
-                return SandSimulation.Instance.referenceTilemap.HasTile(tilePosition) ||
+                return SandSimulation.Instance.collisionTilemap.HasTile(tilePosition) ||
                        targetChunkObj.elements[below.x, below.y] != null;
             }
 
@@ -1005,7 +1006,9 @@ public class SandSimulation : MonoBehaviour
 
         public override void Simulate(Chunk currentChunk)
         {
-            currentChunk.WakeUpChunkNeighbors(localPosition, true);
+            //epicness
+
+            lastPosition = localPosition;
 
             currentChunk.CheckElementContacts(this);
             ApplyFriction();
@@ -1079,7 +1082,7 @@ public class SandSimulation : MonoBehaviour
                 {
                     Vector3Int tilePosition = GetTilemapPosition(belowCheck, targetChunkCheck);
 
-                    bool isEmpty = !SandSimulation.Instance.referenceTilemap.HasTile(tilePosition) &&
+                    bool isEmpty = !SandSimulation.Instance.collisionTilemap.HasTile(tilePosition) &&
                                  targetChunkObjCheck.elements[belowCheck.x, belowCheck.y] == null;
 
                     bool shouldSleep = CanSinkInLiquid(targetChunkObjCheck.elements[belowCheck.x, belowCheck.y]);
@@ -1138,7 +1141,7 @@ public class SandSimulation : MonoBehaviour
                         Vector3Int tilePosition = GetTilemapPosition(adjustedPos, targetChunkPos);
                         nextMoveChunk = targetChunkObject;
 
-                        bool isEmpty = !SandSimulation.Instance.referenceTilemap.HasTile(tilePosition) &&
+                        bool isEmpty = !SandSimulation.Instance.collisionTilemap.HasTile(tilePosition) &&
                                      targetChunkObject.elements[adjustedPos.x, adjustedPos.y] == null;
 
                         if (isEmpty)
@@ -1244,6 +1247,7 @@ public class SandSimulation : MonoBehaviour
                 nextMoveChunk.isActiveNextFrame = true;
                 //currentChunk.WakeUpAllChunkNeighbors(true);
                 currentChunk.WakeUpChunkNeighbors(localPosition, true);
+                if(lastPosition != null) currentChunk.WakeUpChunkNeighbors(lastPosition.Value, true);
             }
 
             if (lastPosition != null)
@@ -1257,11 +1261,12 @@ public class SandSimulation : MonoBehaviour
                     nextMoveChunk.isActiveNextFrame = true;
                     //currentChunk.WakeUpAllChunkNeighbors(true);
                     currentChunk.WakeUpChunkNeighbors(localPosition, true);
+                    if (lastPosition != null) currentChunk.WakeUpChunkNeighbors(lastPosition.Value, true);
                 }
             }
             else
             {
-                lastPosition = GetGlobalPosition();
+                lastPosition = localPosition;
                 if (nextMoveChunk != null)
                 {
                     nextMoveChunk.isActiveNextFrame = true;
@@ -1413,6 +1418,8 @@ public class SandSimulation : MonoBehaviour
             currentChunk.CheckElementContacts(this);
             ApplyFriction();
 
+            lastPosition = localPosition;
+
             Chunk nextMoveChunk = null;
 
             if (isResting)
@@ -1429,7 +1436,7 @@ public class SandSimulation : MonoBehaviour
                 if (SandSimulation.Instance.chunks.TryGetValue(targetChunkCheck, out Chunk targetChunkObjCheck))
                 {
 
-                    bool isEmpty = !SandSimulation.Instance.referenceTilemap.HasTile(new Vector3Int(
+                    bool isEmpty = !SandSimulation.Instance.collisionTilemap.HasTile(new Vector3Int(
                         belowCheck.x / currentChunk.chunkSize + targetChunkCheck.x,
                         belowCheck.y / currentChunk.chunkSize + targetChunkCheck.y,
                         0)) &&
@@ -1552,7 +1559,7 @@ public class SandSimulation : MonoBehaviour
 
                         nextMoveChunk = targetChunkObject;
 
-                        bool isEmpty = !SandSimulation.Instance.referenceTilemap.HasTile(tilePosition) &&
+                        bool isEmpty = !SandSimulation.Instance.collisionTilemap.HasTile(tilePosition) &&
                                      targetChunkObject.elements[adjustedPos.x, adjustedPos.y] == null;
 
                         if (isEmpty)
@@ -1619,7 +1626,7 @@ public class SandSimulation : MonoBehaviour
             }
             else
             {
-                lastPosition = GetGlobalPosition();
+                lastPosition = localPosition;
 
                 //wake up its chunk
                 if (nextMoveChunk != null)

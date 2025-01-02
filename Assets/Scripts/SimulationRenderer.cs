@@ -2,7 +2,9 @@ using UnityEngine;
 
 public class SimulationRenderer : MonoBehaviour
 {
+    // i want to die, haha
     public SandSimulation simulation;
+    public Color backgroundColor = new Color(0.1137f, 0.1137f, 0.1137f, 1f);
     private RenderTexture renderTexture;
     private Material displayMaterial;
     private Color[] colorBuffer;
@@ -13,6 +15,12 @@ public class SimulationRenderer : MonoBehaviour
     private Vector2Int simulationBounds;
 
     void Start()
+    {
+        //Invoke("InitAll", 1f);
+        InitAll();
+    }
+
+    public void InitAll()
     {
         CalculateSimulationBounds();
         InitializeRenderTexture();
@@ -72,7 +80,7 @@ public class SimulationRenderer : MonoBehaviour
         Vector3 worldCenter = new Vector3(
             simulationBounds.x + chunksWide * 0.5f,
             simulationBounds.y + chunksHigh * 0.5f,
-            0.1f
+            /*0.1f*/-2f
         );
         displayQuad.transform.position = worldCenter;
 
@@ -104,7 +112,14 @@ public class SimulationRenderer : MonoBehaviour
 
     private void UpdateTextureFromSimulation()
     {
-        System.Array.Clear(colorBuffer, 0, colorBuffer.Length);
+        //System.Array.Clear(colorBuffer, 0, colorBuffer.Length); //use for black background use case
+        
+        
+        for (int i = 0; i < colorBuffer.Length; i++)
+        {
+            colorBuffer[i] = backgroundColor;
+        }
+        
 
         foreach (var chunkPair in simulation.chunks)
         {
