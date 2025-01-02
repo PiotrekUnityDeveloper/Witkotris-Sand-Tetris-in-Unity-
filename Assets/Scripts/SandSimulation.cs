@@ -1530,7 +1530,7 @@ public class SandSimulation : MonoBehaviour
                             }
                         }
                     }
-                    else if (rnd0 == 0)
+                    else
                     {
                         // Try right side
                         if (Random.value < spreadProbability)
