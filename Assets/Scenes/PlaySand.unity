@@ -170,12 +170,13 @@ MonoBehaviour:
   isSimPaused: 0
   updateInterval: 0.025
   gravity: 0.2
-  chunkSize: 12
+  chunkSize: 8
   chunkGenerationMode: 1
   chunkUpdateMode: 0
   enableDrawing: 1
   selectedElement: sand
   drawingBrushSize: 1
+  interactionUpdatesEnvironment: 1
   simulationRenderer: {fileID: 322835527}
   collisionTilemap: {fileID: 2049313305}
   boundaryTilemap: {fileID: 656367398}

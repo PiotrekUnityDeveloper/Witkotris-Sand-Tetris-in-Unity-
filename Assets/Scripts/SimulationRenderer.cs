@@ -143,13 +143,20 @@ public class SimulationRenderer : MonoBehaviour
                         if (texX >= 0 && texX < textureWidth && texY >= 0 && texY < textureHeight)
                         {
                             int index = texY * textureWidth + texX;
-                            if (particle is SandSimulation.Water)
+                            if (particle.useCustomColorData)
                             {
-                                colorBuffer[index] = new Color(0.2f, 0.4f, 1f, 0.8f);
+                                colorBuffer[index] = particle.GetLocalColor();
                             }
-                            else if (particle is SandSimulation.Sand)
+                            else
                             {
-                                colorBuffer[index] = new Color(0.76f, 0.7f, 0.5f, 1f);
+                                if(particle.colorData != null && particle.colorData.Length > 1)
+                                {
+                                    colorBuffer[index] = particle.colorData[0];
+                                }
+                                else
+                                {
+                                    colorBuffer[index] = Color.white;
+                                }
                             }
                         }
                     }

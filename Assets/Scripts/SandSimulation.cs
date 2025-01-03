@@ -3,13 +3,16 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Linq;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using static SandSimulation;
 using Random = UnityEngine.Random;
 
 public class SandSimulation : MonoBehaviour
 {
     public static SandSimulation Instance { get; set; }
+    public readonly System.Random globalRandom = new System.Random();
 
     public enum ChunkGenerationMode
     {
@@ -59,6 +62,7 @@ public class SandSimulation : MonoBehaviour
     void Start()
     {
         if(initOnStart) InitSimulation();
+        if (initOnStart) CheckForClearLine();
     }
 
     private float timeSinceLastUpdate = 0f;
@@ -89,6 +93,19 @@ public class SandSimulation : MonoBehaviour
         {
             EvacutableElementsAtMousePos();
         }
+    }
+
+    public void CheckForClearLine()
+    {
+        StartCoroutine(CheckForClearLineLoop());
+    }
+
+    public IEnumerator CheckForClearLineLoop()
+    {
+        bool isConnected = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks);
+        if(isConnected) print("connected!");
+        yield return new WaitForSecondsRealtime(2f);
+        StartCoroutine(CheckForClearLineLoop());
     }
 
     // INPUT LOGIC
@@ -932,6 +949,12 @@ public class SandSimulation : MonoBehaviour
         public virtual float horizontalDrag => 0.2f; // Base drag in air
         public virtual float friction => 0.4f; // Additional slowdown when touching surfaces
 
+        //color data
+        public virtual bool useCustomColorData => false;
+        public virtual Color[] colorData => new Color[1]{ new Color(1, 1, 1) };
+        protected Color localColor = Color.white;
+        public Color GetLocalColor() => localColor;
+
 
         public Element(Vector2Int localPos, Vector2Int chunkPos)
         {
@@ -987,14 +1010,31 @@ public class SandSimulation : MonoBehaviour
         public abstract void Simulate(Chunk currentChunk);
     }
 
-    public abstract class PowderParticle : Element
+    public abstract class PowderElement : Element
     {
         // specific for this element/particle type
         public virtual float density => 2.0f; // Default density for powder particles
         public virtual float sinkSpeed => 0.3f; // How fast the particle sinks in liquid
         public virtual float diagonalSinkSpeed => 0.15f; // How likely to sink diagonally
 
-        public PowderParticle(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos) { }
+        //COLOR DATA
+        public override bool useCustomColorData => true;
+        public override Color[] colorData => new Color[]
+        {
+            new Color(0.94f, 0.85f, 0.53f), // Light Beige
+            new Color(0.87f, 0.76f, 0.46f), // Soft Yellow Sand
+            new Color(0.91f, 0.77f, 0.47f), // Light Brown Sand
+            new Color(0.81f, 0.67f, 0.35f), // Desert Sand
+            new Color(0.74f, 0.62f, 0.37f), // Medium Sand
+            new Color(0.85f, 0.72f, 0.48f), // Warm Sand
+            new Color(0.78f, 0.61f, 0.39f), // Brownish Sand
+            new Color(0.92f, 0.80f, 0.47f)  // Pale Sandy Yellow
+        };
+
+        public PowderElement(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos)
+        {
+            
+        }
 
         // overriden from the base Particle class
         public override float maxVelocity => 5f;  // Maximum fall speed
@@ -1002,6 +1042,7 @@ public class SandSimulation : MonoBehaviour
         public override float maxHorizontalVelocity => 3f; // Maximum horizontal speed
         public override float horizontalDrag => 0.2f; // Base drag in air
         public override float friction => 0.4f; // Additional slowdown when touching surfaces
+
 
         private Vector2Int? lastPosition = null;
 
@@ -1030,12 +1071,12 @@ public class SandSimulation : MonoBehaviour
             }
 
             bool shouldSink = false;
-            LiquidParticle liquidBelow = null;
+            LiquidElement liquidBelow = null;
 
             if (SandSimulation.Instance.chunks.TryGetValue(targetChunk, out Chunk targetChunkObj))
             {
                 var particleBelow = targetChunkObj.elements[below.x, below.y];
-                if (particleBelow is LiquidParticle liquid)
+                if (particleBelow is LiquidElement liquid)
                 {
                     liquidBelow = liquid;
                     float densityDiff = density - liquid.density;
@@ -1281,9 +1322,9 @@ public class SandSimulation : MonoBehaviour
         {
             if (particle == null) return false;
 
-            if (particle.GetType() == typeof(LiquidParticle))
+            if (particle.GetType() == typeof(LiquidElement))
             {
-                LiquidParticle liquid = particle as LiquidParticle;
+                LiquidElement liquid = particle as LiquidElement;
                 float densityDiff = density - liquid.density;
 
                 if (densityDiff > 0)
@@ -1292,7 +1333,7 @@ public class SandSimulation : MonoBehaviour
                 }
                 else { return false; }
             }
-            else if (particle.GetType() == typeof(PowderParticle))
+            else if (particle.GetType() == typeof(PowderElement))
             {
                 return false; //powders can sink in each other too, but for now its not added yet
             }
@@ -1305,7 +1346,7 @@ public class SandSimulation : MonoBehaviour
             if (SandSimulation.Instance.chunks.TryGetValue(targetChunkPos, out Chunk targetChunkObj))
             {
                 var particle = targetChunkObj.elements[targetPos.x, targetPos.y];
-                if (particle is LiquidParticle liquid)
+                if (particle is LiquidElement liquid)
                 {
                     float densityDiff = density - liquid.density;
                     if (densityDiff > 0 && Random.value < (swapChance * Mathf.Min(densityDiff, 1f)))
@@ -1398,19 +1439,37 @@ public class SandSimulation : MonoBehaviour
             }
         }
     }
-    public abstract class LiquidParticle : Element
+    public abstract class LiquidElement : Element
     {
         public virtual float density => 1.0f;  // Default density for liquid particles
         public virtual float dispersionRate => 5f;  // How many cells to check horizontally (default 2)
         public virtual float flowSpeed => 0.8f;  // How quickly the liquid flows horizontally
 
-        public LiquidParticle(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos) { }
+        //COLOR DATA
+        public override bool useCustomColorData => false;
+        public override Color[] colorData => new Color[]
+        {
+                    new Color(0.0f, 0.6f, 0.8f), // Light Aqua
+                    new Color(0.1f, 0.5f, 0.7f), // Aqua Blue
+                    new Color(0.0f, 0.4f, 0.6f), // Ocean Blue
+                    new Color(0.2f, 0.7f, 0.9f), // Bright Cyan
+                    new Color(0.1f, 0.6f, 0.8f), // Teal
+                    new Color(0.0f, 0.5f, 0.8f), // Deep Aqua
+                    new Color(0.3f, 0.8f, 0.9f), // Light Sky Blue
+                    new Color(0.1f, 0.4f, 0.5f)  // Deep Water Blue
+        };
+
+        public LiquidElement(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos)
+        {
+            
+        }
 
         public override float maxVelocity => 4f;
         public override float velocityAbsorption => 0.3f;
         public override float maxHorizontalVelocity => 4f;
         public override float horizontalDrag => 0.1f;
         public override float friction => 0.2f;
+
 
         private Vector2Int? lastPosition = null;
 
@@ -1718,25 +1777,65 @@ public class SandSimulation : MonoBehaviour
         }
     }
 
-   
+    
 
-    // ELEMENTS // PARTICLES
+    // ELEMENTS
 
-    public class Water : LiquidParticle
+    public class Sand : PowderElement
     {
-        public Water(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos) { }
+        public override bool useCustomColorData => true;
+        public override Color[] colorData => new Color[]
+        {
+            new Color(0.94f, 0.85f, 0.53f), // Light Beige
+            new Color(0.87f, 0.76f, 0.46f), // Soft Yellow Sand
+            new Color(0.91f, 0.77f, 0.47f), // Light Brown Sand
+            new Color(0.81f, 0.67f, 0.35f), // Desert Sand
+            new Color(0.74f, 0.62f, 0.37f), // Medium Sand
+            new Color(0.85f, 0.72f, 0.48f), // Warm Sand
+            new Color(0.78f, 0.61f, 0.39f), // Brownish Sand
+            new Color(0.92f, 0.80f, 0.47f)  // Pale Sandy Yellow
+        };
+
+        public Sand(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos)
+        {
+            if (useCustomColorData && colorData != null && colorData.Length > 0)
+            {
+                this.localColor = colorData[Random.Range(0, colorData.Length - 1)];
+            }
+        }
+
+        // properties
+        public override float density => 0.8f;
+    }
+
+    public class Water : LiquidElement
+    {
+        public override bool useCustomColorData => true;
+        public override Color[] colorData => new Color[]
+        {
+                    new Color(0.0f, 0.6f, 0.8f), // Light Aqua
+                    new Color(0.1f, 0.5f, 0.7f), // Aqua Blue
+                    new Color(0.0f, 0.4f, 0.6f), // Ocean Blue
+                    new Color(0.2f, 0.7f, 0.9f), // Bright Cyan
+                    new Color(0.1f, 0.6f, 0.8f), // Teal
+                    new Color(0.0f, 0.5f, 0.8f), // Deep Aqua
+                    new Color(0.3f, 0.8f, 0.9f), // Light Sky Blue
+                    new Color(0.1f, 0.4f, 0.5f)  // Deep Water Blue
+        };
+
+        public Water(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos)
+        {
+            if (useCustomColorData && colorData != null && colorData.Length > 0)
+            {
+                this.localColor = colorData[Random.Range(0, colorData.Length - 1)];
+            }
+        }
 
         // properties
         public override float density => 0.5f;
     }
 
-    public class Sand : PowderParticle
-    {
-        public Sand(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos) { }
-
-        // properties
-        public override float density => 0.8f;
-    }
+    
 }
 
 public static class SimulationCoordinateConverter
@@ -1795,4 +1894,175 @@ public static class SimulationCoordinateConverter
         );
     }
 
+}
+
+public static class EdgeConnectionChecker
+{
+    public static bool CheckTypeConnectsBorders<T>(Dictionary<Vector2Int, Chunk> chunks, Color? requiredColor = null) where T : Element
+    {
+        // Find all chunks that contain the specified particle type
+        var relevantChunks = new HashSet<Vector2Int>();
+        var minX = int.MaxValue;
+        var maxX = int.MinValue;
+
+        // First pass: find chunks with the particle type and world boundaries
+        foreach (var kvp in chunks)
+        {
+            if (kvp.Value.HasParticleType<T>())
+            {
+                relevantChunks.Add(kvp.Key);
+                minX = Math.Min(minX, kvp.Key.x);
+                maxX = Math.Max(maxX, kvp.Key.x);
+            }
+        }
+
+        if (relevantChunks.Count == 0) return false;
+
+        // Find particles touching the left edge
+        var startingPoints = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
+        foreach (var chunkPos in relevantChunks.Where(c => c.x == minX))
+        {
+            var chunk = chunks[chunkPos];
+            // Check leftmost column of the chunk
+            for (int y = 0; y < chunk.chunkSize; y++)
+            {
+                var element = chunk.elements[0, y] as T;
+                if (element != null && ColorMatches(element, requiredColor))
+                {
+                    startingPoints.Add((chunkPos, new Vector2Int(0, y)));
+                }
+            }
+        }
+
+        if (startingPoints.Count == 0) return false;
+
+        // For each starting point, try to find a path to the right edge
+        foreach (var start in startingPoints)
+        {
+            var visited = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
+            if (PathExistsToRightEdge<T>(start, chunks, maxX, visited, requiredColor))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ColorMatches(Element element, Color? requiredColor)
+    {
+        if (!requiredColor.HasValue) return true; // No color requirement
+        if (!element.useCustomColorData) return true; // Element doesn't use color data
+
+        // Check if the element's color matches the required color
+        return element.colorData.Contains(requiredColor.Value);
+    }
+
+    private static bool PathExistsToRightEdge<T>(
+        (Vector2Int chunkPos, Vector2Int localPos) current,
+        Dictionary<Vector2Int, Chunk> chunks,
+        int maxX,
+        HashSet<(Vector2Int chunkPos, Vector2Int localPos)> visited,
+        Color? requiredColor) where T : Element
+    {
+        var queue = new Queue<(Vector2Int chunkPos, Vector2Int localPos)>();
+        queue.Enqueue(current);
+        visited.Add(current);
+
+        while (queue.Count > 0)
+        {
+            var (currentChunkPos, currentLocalPos) = queue.Dequeue();
+            var currentChunk = chunks[currentChunkPos];
+
+            // Check if we reached the right edge
+            if (currentChunkPos.x == maxX && currentLocalPos.x == currentChunk.chunkSize - 1)
+            {
+                return true;
+            }
+
+            // Check all adjacent positions (including diagonals)
+            Vector2Int[] directions = new Vector2Int[]
+            {
+                new Vector2Int(1, 0),   // right
+                new Vector2Int(-1, 0),  // left
+                new Vector2Int(0, 1),   // up
+                new Vector2Int(0, -1),  // down
+                new Vector2Int(1, 1),   // up-right
+                new Vector2Int(1, -1),  // down-right
+                new Vector2Int(-1, 1),  // up-left
+                new Vector2Int(-1, -1), // down-left
+            };
+
+            foreach (var dir in directions)
+            {
+                var nextLocalPos = currentLocalPos + dir;
+                var nextChunkPos = currentChunkPos;
+
+                // Handle chunk boundaries
+                if (nextLocalPos.x >= currentChunk.chunkSize)
+                {
+                    nextLocalPos.x = 0;
+                    nextChunkPos.x += 1;
+                }
+                else if (nextLocalPos.x < 0)
+                {
+                    nextLocalPos.x = currentChunk.chunkSize - 1;
+                    nextChunkPos.x -= 1;
+                }
+
+                if (nextLocalPos.y >= currentChunk.chunkSize)
+                {
+                    nextLocalPos.y = 0;
+                    nextChunkPos.y += 1;
+                }
+                else if (nextLocalPos.y < 0)
+                {
+                    nextLocalPos.y = currentChunk.chunkSize - 1;
+                    nextChunkPos.y -= 1;
+                }
+
+                var nextPos = (nextChunkPos, nextLocalPos);
+
+                // Skip if already visited or chunk doesn't exist
+                if (visited.Contains(nextPos) || !chunks.ContainsKey(nextChunkPos))
+                    continue;
+
+                // Check if the next position contains the correct particle type and color
+                var nextChunk = chunks[nextChunkPos];
+                var nextElement = nextChunk.elements[nextLocalPos.x, nextLocalPos.y] as T;
+                if (nextElement != null && ColorMatches(nextElement, requiredColor))
+                {
+                    queue.Enqueue(nextPos);
+                    visited.Add(nextPos);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // Helper method to check if a specific colored line exists
+    public static bool CheckColoredTypeConnectsBorders<T>(Dictionary<Vector2Int, Chunk> chunks, Color color) where T : Element
+    {
+        return CheckTypeConnectsBorders<T>(chunks, color);
+    }
+}
+
+public class ArrayUtility
+{
+    public static Vector2Int[] Shuffle(Vector2Int[] array)
+    {
+        if (array is null)
+            throw new ArgumentNullException(nameof(array));
+
+        for (int i = 0; i < array.Length - 1; ++i)
+        {
+            int r = Random.Range(i, array.Length);  // Unity's Random.Range for index selection
+            // Swap Vector2Int elements
+            Vector2Int temp = array[r];
+            array[r] = array[i];
+            array[i] = temp;
+        }
+        return array;  // Return the shuffled array
+    }
 }
