@@ -175,7 +175,7 @@ MonoBehaviour:
   chunkUpdateMode: 0
   enableDrawing: 1
   selectedElement: sand
-  drawingBrushSize: 1
+  drawingBrushSize: 10
   interactionUpdatesEnvironment: 1
   simulationRenderer: {fileID: 322835527}
   collisionTilemap: {fileID: 2049313305}

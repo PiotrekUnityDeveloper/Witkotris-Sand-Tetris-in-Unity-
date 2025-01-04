@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Linq;
+using System.Xml;
 using Unity.Mathematics;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -219,7 +220,20 @@ public class SandSimulation : MonoBehaviour
                     {
                         chunk.WakeUpParticleNeighbors(localPos, chunkPos); //reqiured
                         if(interactionUpdatesEnvironment) chunk.WakeUpAllChunkNeighbors(true);
-                        chunk.elements[localPos.x, localPos.y] = null;
+                        if (chunk.elements[localPos.x, localPos.y].containedInObject == false)
+                        {
+                            chunk.elements[localPos.x, localPos.y] = null;
+                        }
+                        else
+                        {
+                            chunk.elements[localPos.x, localPos.y].containingObject.containedElements.Remove(chunk.elements[localPos.x, localPos.y]);
+                            chunk.elements[localPos.x, localPos.y].containedInObject = false;
+                            chunk.elements[localPos.x, localPos.y] = null;
+
+                            
+
+                            //or granularize it if you want to...
+                        }
 
                         // Check if the chunk is now empty
                         bool hasParticles = false;
@@ -348,69 +362,54 @@ public class SandSimulation : MonoBehaviour
 
     public void CreateSimObject()
     {
-        print("creating sim object... please wait..");
         Vector2 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Debug.Log($"Mouse World Pos: {mouseWorldPos}");
+
+        Vector2 checkPos = new Vector2(
+                    mouseWorldPos.x / (float)chunkSize,
+                    mouseWorldPos.y / (float)chunkSize
+                );
+
+        Vector2Int cellPos = new Vector2Int(
+                    Mathf.FloorToInt(checkPos.x),
+                    Mathf.FloorToInt(checkPos.y)
+                );
 
         Vector2Int chunkPos = new Vector2Int(
-            Mathf.FloorToInt(mouseWorldPos.x),
-            Mathf.FloorToInt(mouseWorldPos.y)
+            Mathf.FloorToInt(cellPos.x),
+            Mathf.FloorToInt(cellPos.y)
         );
+
+        //chunkPos = (Vector2Int)SandSimulation.Instance.boundaryTilemap.WorldToCell(mouseWorldPos);
 
         Vector2Int localPos = new Vector2Int(
-            (int)mouseWorldPos.x % chunkSize,
-            (int)mouseWorldPos.y % chunkSize
+            Mathf.RoundToInt(chunkPos.x * chunkSize),
+            Mathf.RoundToInt(chunkPos.y * chunkSize)
         );
+        Debug.Log($"Pre-clamp Local Pos: {localPos}");
 
+        // Clamp local position to chunk bounds
+        localPos.x = Mathf.Clamp(localPos.x, 0, chunkSize - 1);
+        localPos.y = Mathf.Clamp(localPos.y, 0, chunkSize - 1);
+        Debug.Log($"Final Local Pos: {localPos}");
+
+        // Create block using the raw mouse world position 
         WitkotrisBlock newBlock = new WitkotrisBlock(mouseWorldPos);
+        newBlock._objectChunkPos = chunkPos;
+        newBlock._objectLocalPos = localPos;
+        Debug.Log($"Block Object Position: {newBlock.objectPosition}");
+        Debug.Log($"Block Chunk Pos: {newBlock._objectChunkPos}, Local Pos: {newBlock._objectLocalPos}");
+
         newBlock.elementType = "sand";
         newBlock.tileShapeSprite = sampleSprite;
         newBlock.InitializeBlock();
         simObjects.Add(newBlock);
 
-        /*
-        int checkRadius = Mathf.CeilToInt(drawingBrushSize);
-        for (int xOffset = -checkRadius; xOffset <= checkRadius; xOffset++)
+        if (chunks.ContainsKey(chunkPos))
         {
-            for (int yOffset = -checkRadius; yOffset <= checkRadius; yOffset++)
-            {
-                Vector2 checkPos = new Vector2(
-                    mouseWorldPos.x + xOffset / (float)chunkSize,
-                    mouseWorldPos.y + yOffset / (float)chunkSize
-                );
-
-                float distance = Vector2.Distance(mouseWorldPos, checkPos);
-                if (distance > drawingBrushSize / (float)chunkSize) continue;
-
-                Vector2Int cellPos = new Vector2Int(
-                    Mathf.FloorToInt(checkPos.x),
-                    Mathf.FloorToInt(checkPos.y)
-                );
-
-                Vector2Int chunkPos = new Vector2Int(
-                    Mathf.FloorToInt(cellPos.x),
-                    Mathf.FloorToInt(cellPos.y)
-                );
-
-                Vector2Int localPos = new Vector2Int(
-                    Mathf.RoundToInt((checkPos.x - chunkPos.x) * chunkSize),
-                    Mathf.RoundToInt((checkPos.y - chunkPos.y) * chunkSize)
-                );
-
-                localPos.x = Mathf.Clamp(localPos.x, 0, chunkSize - 1);
-                localPos.y = Mathf.Clamp(localPos.y, 0, chunkSize - 1);
-
-                if (chunks.ContainsKey(chunkPos))
-                {
-                    Chunk chunk = chunks[chunkPos];
-                    if (chunk.elements[localPos.x, localPos.y] != null)
-                    {
-                        chunk.WakeUpParticleNeighbors(localPos, chunkPos); //reqiured
-                        if (interactionUpdatesEnvironment) chunk.WakeUpAllChunkNeighbors(true);
-                        WitkotrisBlock newBlock = new WitkotrisBlock();
-                    }
-                }
-            }
-        }*/
+            chunks[chunkPos].isActive = true;
+            chunks[chunkPos].isActiveNextFrame = true;
+        }
     }
 
     public void EvacuateChunk(Vector2Int chunkPosition)
@@ -505,59 +504,50 @@ public class SandSimulation : MonoBehaviour
 #if UNITY_EDITOR
     private void OnDrawGizmos()
     {
-        if (chunks == null) return;
-        if(!drawDebug) return;
-
-
+        if (chunks == null || !drawDebug) return;
         float scale = 1f / chunkSize;
 
         foreach (var chunk in chunks.Values)
         {
-            if(SandSimulation.Instance.renderChunkBorders && !SandSimulation.Instance.showActiveChunks)
+            // Convert chunk position directly since it's already in tilemap coordinates
+            Vector3 chunkCenter = new Vector3(
+                chunk.chunkPosition.x + 0.5f,
+                chunk.chunkPosition.y + 0.5f,
+                0
+            );
+
+            // Render chunk borders
+            if (SandSimulation.Instance.renderChunkBorders && !SandSimulation.Instance.showActiveChunks)
             {
                 Gizmos.color = Color.red;
-                Vector3 chunkWorldPos = new Vector3(chunk.chunkPosition.x, chunk.chunkPosition.y, 0);
-                Gizmos.DrawWireCube(chunkWorldPos + Vector3.one * 0.5f, Vector3.one);
+                Gizmos.DrawWireCube(chunkCenter, Vector3.one);
             }
+            // Show active chunks
             else if (SandSimulation.Instance.showActiveChunks && !SandSimulation.Instance.renderChunkBorders)
             {
                 Chunk ch;
-                Gizmos.color = Color.green;
-                Vector3 chunkWorldPos = new Vector3(chunk.chunkPosition.x, chunk.chunkPosition.y, 0);
-                chunks.TryGetValue(SimulationCoordinateConverter.WorldToChunkPosition(chunkWorldPos), out ch);
-
-                if(ch != null)
+                chunks.TryGetValue(chunk.chunkPosition, out ch);
+                if (ch != null && ch.isActive)
                 {
-                    if (ch.isActive)
-                    {
-                        Gizmos.DrawWireCube(chunkWorldPos + Vector3.one * 0.5f, Vector3.one);
-                    }
+                    Gizmos.color = Color.green;
+                    Gizmos.DrawWireCube(chunkCenter, Vector3.one);
                 }
             }
+            // Show both active and inactive chunks
             else if (SandSimulation.Instance.showActiveChunks && SandSimulation.Instance.renderChunkBorders)
             {
                 Chunk ch;
-                Vector3 chunkWorldPos = new Vector3(chunk.chunkPosition.x, chunk.chunkPosition.y, 0);
-                chunks.TryGetValue(SimulationCoordinateConverter.WorldToChunkPosition(chunkWorldPos), out ch);
-
+                chunks.TryGetValue(chunk.chunkPosition, out ch);
                 if (ch != null)
                 {
-                    if (ch.isActive)
-                    {
-                        Gizmos.color = Color.green;
-                        Gizmos.DrawWireCube(chunkWorldPos + Vector3.one * 0.5f, Vector3.one);
-                    }
-                    else if (!ch.isActive)
-                    {
-                        Gizmos.color = Color.red;
-                        Gizmos.DrawWireCube(chunkWorldPos + Vector3.one * 0.5f, Vector3.one);
-                    }
+                    Gizmos.color = ch.isActive ? Color.green : Color.red;
+                    Gizmos.DrawWireCube(chunkCenter, Vector3.one);
                 }
             }
 
+            // Draw elements within chunks
             if (SandSimulation.Instance.renderElements)
             {
-                // Draw particles
                 for (int x = 0; x < chunk.chunkSize; x++)
                 {
                     for (int y = 0; y < chunk.chunkSize; y++)
@@ -567,17 +557,17 @@ public class SandSimulation : MonoBehaviour
                         {
                             float worldX = chunk.chunkPosition.x + (x * scale);
                             float worldY = chunk.chunkPosition.y + (y * scale);
-                            Vector3 worldPos = new Vector3(worldX, worldY, 0);
+                            Vector3 elementCenter = new Vector3(worldX, worldY, 0) + (Vector3.one * scale * 0.5f);
 
                             Gizmos.color = Color.yellow;
-                            Gizmos.DrawCube(worldPos + (Vector3.one * scale * 0.5f), Vector3.one * scale * 0.8f);
+                            Gizmos.DrawCube(elementCenter, Vector3.one * scale * 0.8f);
                         }
                     }
                 }
             }
         }
     }
-    #endif
+#endif
 
     public class Chunk
     {
@@ -657,9 +647,7 @@ public class SandSimulation : MonoBehaviour
         {
             if (localPos.x >= 0 && localPos.x < chunkSize && localPos.y >= 0 && localPos.y < chunkSize)
             {
-                Element newParticle;
-                newParticle = elementToAdd;
-                elements[localPos.x, localPos.y] = newParticle;
+                elements[localPos.x, localPos.y] = elementToAdd;
                 this.isActive = true;
                 this.isActiveNextFrame = true;
             }
@@ -1034,6 +1022,8 @@ public class SandSimulation : MonoBehaviour
     public abstract class SimulationObject
     {
         private Vector2? _objectPosition; // Backing field
+        public Vector2Int _objectChunkPos;
+        public Vector2Int _objectLocalPos;
 
         public virtual Vector2? objectPosition
         {
@@ -1084,10 +1074,12 @@ public class SandSimulation : MonoBehaviour
 
         public string elementType = null;
         public Sprite tileShapeSprite = null;
+        private bool initialized = false;
 
         public WitkotrisBlock(Vector2 objectPos) : base(objectPos)
         {
             objectPosition = objectPos;
+            initialized = false;
             //InitializeBlock();
         }
 
@@ -1124,44 +1116,60 @@ public class SandSimulation : MonoBehaviour
                 }
             }
 
-
+            initialized = true;
         }
 
         void ProcessPixel(int x, int y, Color color)
         {
-            if(!objectPosition.HasValue) return;
-            if(color.a != 1) return;
+            if (!objectPosition.HasValue) return;
+            if (color.a != 1) return;
 
-            //Vector2Int chunkPos = SimulationCoordinateConverter.WorldToChunkPosition(new Vector2(this.objectPosition.Value.x - x,
-            //    this.objectPosition.Value.y - y));
+            // Calculate world position for this pixel
+            Vector2 worldPos = new Vector2(
+                this.objectPosition.Value.x + x,
+                this.objectPosition.Value.y + y
+            );
 
-            //Vector2Int localPos = SimulationCoordinateConverter.WorldToLocalPosition(new Vector2(this.objectPosition.Value.x - x,
-            //    this.objectPosition.Value.y - y), SandSimulation.Instance.chunkSize);
-
+            // Calculate correct chunk position
             Vector2Int chunkPos = new Vector2Int(
-                Mathf.FloorToInt(this.objectPosition.Value.x),
-                Mathf.FloorToInt(this.objectPosition.Value.y)
+                Mathf.FloorToInt(worldPos.x / SandSimulation.Instance.chunkSize),
+                Mathf.FloorToInt(worldPos.y / SandSimulation.Instance.chunkSize)
             );
 
+            // Calculate local position within chunk
             Vector2Int localPos = new Vector2Int(
-                (int)this.objectPosition.Value.x % SandSimulation.Instance.chunkSize,
-                (int)this.objectPosition.Value.y % SandSimulation.Instance.chunkSize
+                Mathf.FloorToInt(worldPos.x) % SandSimulation.Instance.chunkSize,
+                Mathf.FloorToInt(worldPos.y) % SandSimulation.Instance.chunkSize
             );
 
-            localPos = new Vector2Int(Convert.ToInt32(this.objectPosition.Value.x - chunkPos.x), Convert.ToInt32(this.objectPosition.Value.y - chunkPos.y));
+            // Handle negative coordinates
+            if (localPos.x < 0) localPos.x += SandSimulation.Instance.chunkSize;
+            if (localPos.y < 0) localPos.y += SandSimulation.Instance.chunkSize;
 
             if (elementType == "sand")
             {
                 Sand e_sand = new Sand(localPos, chunkPos);
+                Vector2Int adjustedLocal = e_sand.AdjustPositionForChunk(localPos, ref chunkPos, SandSimulation.Instance.chunkSize);
+
+                /// Debug visualization
+                ///Vector3 debugWorldPos = SimulationCoordinateConverter.ChunkToWorldPosition(chunkPos, adjustedLocal,
+                ///    SandSimulation.Instance.chunkSize);
+                ///Debug.DrawLine(debugWorldPos, debugWorldPos + Vector3.forward * 0.01f, Color.red, 5.0f);
+
+                e_sand.localPosition = adjustedLocal;
+                e_sand.chunkPosition = chunkPos;
                 e_sand.useCustomColorData = true;
                 e_sand.LocalColor = color;
                 e_sand.containedInObject = true;
+                e_sand.containingObject = this;
 
-                SandSimulation.Instance.chunks.TryGetValue(chunkPos, out Chunk chunkToAdd);
-                if (chunkToAdd != null)
+                if (SandSimulation.Instance.chunks.TryGetValue(chunkPos, out Chunk chunkToAdd) && chunkToAdd != null)
                 {
                     chunkToAdd.AddCustomElement(localPos, e_sand);
                     this.containedElements.Add(e_sand);
+                    // Make sure the chunk is active
+                    //chunkToAdd.isActive = true;
+                    //chunkToAdd.isActiveNextFrame = true;
                 }
             }
             else if(elementType == "water")
@@ -1176,6 +1184,9 @@ public class SandSimulation : MonoBehaviour
                 {
                     chunkToAdd.AddCustomElement(localPos, e_water);
                     this.containedElements.Add(e_water);
+                    // Make sure the chunk is active
+                    //chunkToAdd.isActive = true;
+                    //chunkToAdd.isActiveNextFrame = true;
                 }
 
             }
@@ -1216,38 +1227,47 @@ public class SandSimulation : MonoBehaviour
 
         public override void Simulate()
         {
-            foreach(Element element in containedElements)
+            if (!initialized) return;
+            if (containedElements.Count <= 0) SandSimulation.Instance.simObjects.Remove(this);
+
+            foreach (Element element in containedElements.ToList()) // Use ToList() to avoid modification issues
             {
-                if(elementType == "sand" && element.containedInObject)
+                if (elementType == "sand" && element.containedInObject)
                 {
                     Sand sand = element as Sand;
                     Vector2Int chunkPOS = sand.chunkPosition;
-                    Vector2Int targetPos = sand.AdjustPositionForChunk(new Vector2Int(sand.localPosition.x, sand.localPosition.y - 1), ref chunkPOS, SandSimulation.Instance.chunkSize);
-                    
+                    Vector2Int targetPos = sand.AdjustPositionForChunk(
+                        new Vector2Int(sand.localPosition.x, sand.localPosition.y - 1),
+                        ref chunkPOS,
+                        SandSimulation.Instance.chunkSize
+                    );
+
                     if (SandSimulation.Instance.chunks.TryGetValue(chunkPOS, out Chunk targetChunkObject))
                     {
+                        targetChunkObject.isActive = true; // Keep target chunk active
+                        targetChunkObject.isActiveNextFrame = true;
+
                         Vector3Int tilePosition = sand.GetTilemapPosition(targetPos, chunkPOS);
 
                         bool isEmpty = !SandSimulation.Instance.collisionTilemap.HasTile(tilePosition) &&
-                                     targetChunkObject.elements[targetPos.x, targetPos.y] == null;
+                                     (targetChunkObject.elements[targetPos.x, targetPos.y] == null ||
+                                      targetChunkObject.elements[targetPos.x, targetPos.y].containedInObject);
 
-                        Chunk sandChunk;
-                        SandSimulation.Instance.chunks.TryGetValue(chunkPOS, out sandChunk);
+                        if (SandSimulation.Instance.chunks.TryGetValue(sand.chunkPosition, out Chunk sandChunk))
+                        {
+                            sandChunk.isActive = true; // Keep source chunk active
+                            sandChunk.isActiveNextFrame = true;
 
-                        if (isEmpty && sandChunk != null)
-                        {
-                            sand.MoveToNewPositionCST(targetPos, chunkPOS, sandChunk, targetChunkObject, sand.localPosition);
-                        }
-                        else if(isEmpty)
-                        {
-                            Granularize();
+                            if (isEmpty && sandChunk != null)
+                            {
+                                sand.MoveToNewPositionCST(targetPos, chunkPOS, sandChunk, targetChunkObject, sand.localPosition);
+                            }
+                            else if (!isEmpty)
+                            {
+                                Granularize();
+                            }
                         }
                     }
-                }
-                else if(elementType == "water")
-                {
-                    Water water = element as Water;
-
                 }
             }
         }
@@ -1262,6 +1282,7 @@ public class SandSimulation : MonoBehaviour
             foreach(Element e in containedElements)
             {
                 e.containedInObject = false;
+                e.containingObject = null;
             }
 
             SandSimulation.Instance.simObjects.Remove(this);
@@ -1271,6 +1292,7 @@ public class SandSimulation : MonoBehaviour
     public abstract class Element
     {
         public bool containedInObject = false;
+        public SimulationObject containingObject = null;
 
         public Vector2Int localPosition;
         public Vector2Int chunkPosition;
@@ -1737,6 +1759,10 @@ public class SandSimulation : MonoBehaviour
                         horizontalVelocity *= 0.8f;
                         return true;
                     }
+                    else
+                    {
+                        currentChunk.WakeUpChunkNeighbors(localPosition, true);
+                    }
                 }
             }
             return false;
@@ -2200,15 +2226,16 @@ public class SandSimulation : MonoBehaviour
         public override bool useCustomColorData => true;
         public override Color[] colorData => new Color[]
         {
-                    new Color(0.0f, 0.6f, 0.8f), // Light Aqua
-                    new Color(0.1f, 0.5f, 0.7f), // Aqua Blue
-                    new Color(0.0f, 0.4f, 0.6f), // Ocean Blue
-                    new Color(0.2f, 0.7f, 0.9f), // Bright Cyan
-                    new Color(0.1f, 0.6f, 0.8f), // Teal
-                    new Color(0.0f, 0.5f, 0.8f), // Deep Aqua
-                    new Color(0.3f, 0.8f, 0.9f), // Light Sky Blue
-                    new Color(0.1f, 0.4f, 0.5f)  // Deep Water Blue
+            new Color(0.0f, 0.2f, 0.3f), // Deep Aqua
+            new Color(0.1f, 0.3f, 0.4f), // Dark Teal
+            new Color(0.0f, 0.15f, 0.25f), // Abyss Blue
+            new Color(0.1f, 0.25f, 0.35f), // Midnight Blue
+            new Color(0.05f, 0.2f, 0.3f), // Deep Ocean
+            new Color(0.0f, 0.1f, 0.2f), // Twilight Depth
+            new Color(0.15f, 0.3f, 0.35f), // Dim Cyan
+            new Color(0.1f, 0.2f, 0.25f)  // Murky Water Blue
         };
+
 
         public Water(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos)
         {
@@ -2230,57 +2257,53 @@ public static class SimulationCoordinateConverter
     // Convert a tilemap position to chunk position
     public static Vector2Int TilemapToChunkPosition(Vector3Int tilemapPosition)
     {
+        // This is fine as is since tiles map 1:1 with chunks
         return new Vector2Int(tilemapPosition.x, tilemapPosition.y);
     }
 
     // Convert a world position to chunk position
     public static Vector2Int WorldToChunkPosition(Vector2 worldPosition)
     {
+        // We need to divide by chunk size to get the correct chunk coordinate
         return new Vector2Int(
-            Mathf.FloorToInt(worldPosition.x),
-            Mathf.FloorToInt(worldPosition.y)
+            Mathf.FloorToInt(worldPosition.x / SandSimulation.Instance.chunkSize),
+            Mathf.FloorToInt(worldPosition.y / SandSimulation.Instance.chunkSize)
         );
     }
 
     // Convert a world position to local position within a chunk
     public static Vector2Int WorldToLocalPosition(Vector2 worldPosition, int chunkSize)
     {
-        Vector2Int chunkPos = WorldToChunkPosition(worldPosition);
+        // Use modulo to get position within chunk
+        int x = Mathf.FloorToInt(worldPosition.x) % chunkSize;
+        int y = Mathf.FloorToInt(worldPosition.y) % chunkSize;
 
-        // Calculate local position within the chunk
-        Vector2Int localPos = new Vector2Int(
-            Mathf.RoundToInt((worldPosition.x - chunkPos.x) * chunkSize),
-            Mathf.RoundToInt((worldPosition.y - chunkPos.y) * chunkSize)
-        );
+        // Handle negative coordinates
+        if (x < 0) x += chunkSize;
+        if (y < 0) y += chunkSize;
 
-        // Clamp to chunk bounds
-        localPos.x = Mathf.Clamp(localPos.x, 0, chunkSize - 1);
-        localPos.y = Mathf.Clamp(localPos.y, 0, chunkSize - 1);
-
-        return localPos;
+        return new Vector2Int(x, y);
     }
 
     // Convert chunk and local position to world position
     public static Vector2 ChunkToWorldPosition(Vector2Int chunkPos, Vector2Int localPos, int chunkSize)
     {
+        // Multiply chunk position by chunk size and add local offset
         return new Vector2(
-            chunkPos.x + (float)localPos.x / chunkSize,
-            chunkPos.y + (float)localPos.y / chunkSize
+            chunkPos.x * chunkSize + localPos.x,
+            chunkPos.y * chunkSize + localPos.y
         );
     }
-
-    //extra
 
     // Convert a local position within a chunk to a world position
     public static Vector2 LocalToWorldPosition(Vector2Int localPos, Vector2Int chunkPos, int chunkSize)
     {
-        // Calculate the world position
+        // Same as ChunkToWorldPosition
         return new Vector2(
-            chunkPos.x + (float)localPos.x / chunkSize,
-            chunkPos.y + (float)localPos.y / chunkSize
+            chunkPos.x * chunkSize + localPos.x,
+            chunkPos.y * chunkSize + localPos.y
         );
     }
-
 }
 
 public static class EdgeConnectionChecker
