@@ -6,6 +6,7 @@ using System.Linq;
 using System.Xml;
 using Unity.Mathematics;
 using Unity.VisualScripting;
+using Unity.VisualScripting.FullSerializer;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using static SandSimulation;
@@ -108,10 +109,32 @@ public class SandSimulation : MonoBehaviour
         StartCoroutine(CheckForClearLineLoop());
     }
 
+    public Color[] targetColorData => new Color[]
+        {
+            new Color(0.94f, 0.85f, 0.53f, 1f), // Light Beige
+            new Color(0.87f, 0.76f, 0.46f, 1f), // Soft Yellow Sand
+            new Color(0.91f, 0.77f, 0.47f, 1f), // Light Brown Sand
+            new Color(0.81f, 0.67f, 0.35f, 1f), // Desert Sand
+            new Color(0.74f, 0.62f, 0.37f, 1f), // Medium Sand
+            new Color(0.85f, 0.72f, 0.48f, 1f), // Warm Sand
+            new Color(0.78f, 0.61f, 0.39f, 1f), // Brownish Sand
+            new Color(0.92f, 0.80f, 0.47f, 1f)  // Pale Sandy Yellow
+        };
+
+    public Color[] blueColorData => new Color[]
+    {
+        new Color(0.1261561f, 0.391388f, 0.8627451f, 1f),
+        new Color(0.1359045f, 0.1359045f, 0.9294118f, 1f)
+    };
+
     public IEnumerator CheckForClearLineLoop()
     {
-        bool isConnected = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks);
-        if(isConnected) print("connected!");
+        bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, targetColorData);
+        if(isConnectedSand) print("connected sand!");
+
+        bool isConnectedBlueSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, blueColorData);
+        if (isConnectedBlueSand) print("connected bluesand!");
+
         yield return new WaitForSecondsRealtime(2f);
         StartCoroutine(CheckForClearLineLoop());
     }
@@ -1111,6 +1134,9 @@ public class SandSimulation : MonoBehaviour
             // Get the sprite's rect in the texture
             Rect rect = sprite.textureRect;
 
+            // Save texture's colors here
+            HashSet<Color> uniqueColors = new HashSet<Color>();
+
             // Convert rect to pixel coordinates
             int xStart = Mathf.RoundToInt(rect.x);
             int yStart = Mathf.RoundToInt(rect.y);
@@ -1123,14 +1149,34 @@ public class SandSimulation : MonoBehaviour
                 for (int x = xStart; x < xStart + width; x++)
                 {
                     Color pixelColor = texture.GetPixel(x, y);
-                    ProcessPixel(x, y, pixelColor);
+
+                    if (pixelColor.a == 1f)
+                    {
+                        // Calculate brightness as a simple average of RGB components
+                        float brightness = (pixelColor.r + pixelColor.g + pixelColor.b) / 3f;
+
+                        // Blend the color based on brightness and tileColor
+                        Color finalColor = new Color(
+                            tileColor.r * brightness,
+                            tileColor.g * brightness,
+                            tileColor.b * brightness,
+                            1f
+                        );
+
+                        //print("adding color: " + finalColor.r + " " + finalColor.g + " " + finalColor.b);
+
+
+                        uniqueColors.Add(finalColor);
+                    }
+
+                    ProcessPixel(x, y, pixelColor, uniqueColors);
                 }
             }
 
             initialized = true;
         }
 
-        void ProcessPixel(int x, int y, Color color)
+        void ProcessPixel(int x, int y, Color color, HashSet<Color> colorData)
         {
             if (!objectPosition.HasValue) return;
             if (color.a != 1) return;
@@ -1185,6 +1231,9 @@ public class SandSimulation : MonoBehaviour
                 e_sand.chunkPosition = chunkPos;
                 e_sand.useCustomColorData = true;
                 e_sand.LocalColor = finalColor;
+                //add color data for the borderedge algorithm
+                //e_sand.colorData = colorData.ToArray();
+                e_sand.SetCustomColorData(colorData.ToArray());
                 e_sand.containedInObject = true;
                 e_sand.containingObject = this;
 
@@ -1199,20 +1248,6 @@ public class SandSimulation : MonoBehaviour
             }
             else if(elementType == "water")
             {
-                Water e_water = new Water(localPos, chunkPos);
-                e_water.useCustomColorData = true;
-                e_water.LocalColor = color;
-                e_water.containedInObject = true;
-
-                SandSimulation.Instance.chunks.TryGetValue(chunkPos, out Chunk chunkToAdd);
-                if (chunkToAdd != null)
-                {
-                    chunkToAdd.AddCustomElement(localPos, e_water);
-                    this.containedElements.Add(e_water);
-                    // Make sure the chunk is active
-                    //chunkToAdd.isActive = true;
-                    //chunkToAdd.isActiveNextFrame = true;
-                }
 
             }
         }
@@ -1345,6 +1380,7 @@ public class SandSimulation : MonoBehaviour
                 if (value != null && value.Length > 0)
                 {
                     _colorData = value;
+                    Debug.Log("value was modified to " + value.Length + " length");
                 }
                 else
                 {
@@ -2221,18 +2257,22 @@ public class SandSimulation : MonoBehaviour
 
     public class Sand : PowderElement
     {
-        public override bool useCustomColorData => true;
-        public override Color[] colorData => new Color[]
+        private Color[] _customColorData;
+
+        public override Color[] colorData => _customColorData ?? new Color[]
         {
-            new Color(0.94f, 0.85f, 0.53f), // Light Beige
-            new Color(0.87f, 0.76f, 0.46f), // Soft Yellow Sand
-            new Color(0.91f, 0.77f, 0.47f), // Light Brown Sand
-            new Color(0.81f, 0.67f, 0.35f), // Desert Sand
-            new Color(0.74f, 0.62f, 0.37f), // Medium Sand
-            new Color(0.85f, 0.72f, 0.48f), // Warm Sand
-            new Color(0.78f, 0.61f, 0.39f), // Brownish Sand
-            new Color(0.92f, 0.80f, 0.47f)  // Pale Sandy Yellow
+            new Color(0.94f, 0.85f, 0.53f, 1f), // Light Beige
+            new Color(0.87f, 0.76f, 0.46f, 1f), // Soft Yellow Sand
+            new Color(0.91f, 0.77f, 0.47f, 1f), // Light Brown Sand
+            new Color(0.81f, 0.67f, 0.35f, 1f), // Desert Sand
+            new Color(0.74f, 0.62f, 0.37f, 1f), // Medium Sand
+            new Color(0.85f, 0.72f, 0.48f, 1f), // Warm Sand
+            new Color(0.78f, 0.61f, 0.39f, 1f), // Brownish Sand
+            new Color(0.92f, 0.80f, 0.47f, 1f)  // Pale Sandy Yellow
         };
+
+        public override bool useCustomColorData => true;
+        public override float density => 0.8f;
 
         public Sand(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos)
         {
@@ -2242,25 +2282,32 @@ public class SandSimulation : MonoBehaviour
             }
         }
 
-        // properties
-        public override float density => 0.8f;
+        public void SetCustomColorData(Color[] colors)
+        {
+            _customColorData = colors;
+        }
     }
 
     public class Water : LiquidElement
-    {
-        public override bool useCustomColorData => true;
-        public override Color[] colorData => new Color[]
+    { 
+
+        private Color[] _customColorData;
+        public override Color[] colorData => _customColorData ?? new Color[]
         {
-            new Color(0.0f, 0.2f, 0.3f), // Deep Aqua
-            new Color(0.1f, 0.3f, 0.4f), // Dark Teal
-            new Color(0.0f, 0.15f, 0.25f), // Abyss Blue
-            new Color(0.1f, 0.25f, 0.35f), // Midnight Blue
-            new Color(0.05f, 0.2f, 0.3f), // Deep Ocean
-            new Color(0.0f, 0.1f, 0.2f), // Twilight Depth
-            new Color(0.15f, 0.3f, 0.35f), // Dim Cyan
-            new Color(0.1f, 0.2f, 0.25f)  // Murky Water Blue
+            new Color(0.0f, 0.2f, 0.3f, 1f), // Deep Aqua
+            new Color(0.1f, 0.3f, 0.4f, 1f), // Dark Teal
+            new Color(0.0f, 0.15f, 0.25f, 1f), // Abyss Blue
+            new Color(0.1f, 0.25f, 0.35f, 1f), // Midnight Blue
+            new Color(0.05f, 0.2f, 0.3f, 1f), // Deep Ocean
+            new Color(0.0f, 0.1f, 0.2f, 1f), // Twilight Depth
+            new Color(0.15f, 0.3f, 0.35f, 1f), // Dim Cyan
+            new Color(0.1f, 0.2f, 0.25f, 1f)  // Murky Water Blue
         };
 
+        // properties
+
+        public override bool useCustomColorData => true;
+        public override float density => 0.5f;
 
         public Water(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos)
         {
@@ -2270,8 +2317,10 @@ public class SandSimulation : MonoBehaviour
             }
         }
 
-        // properties
-        public override float density => 0.5f;
+        public void SetCustomColorData(Color[] colors)
+        {
+            _customColorData = colors;
+        }
     }
 
     
@@ -2333,7 +2382,7 @@ public static class SimulationCoordinateConverter
 
 public static class EdgeConnectionChecker
 {
-    public static bool CheckTypeConnectsBorders<T>(Dictionary<Vector2Int, Chunk> chunks, Color? requiredColor = null) where T : Element
+    public static bool CheckTypeConnectsBorders<T>(Dictionary<Vector2Int, Chunk> chunks, Color[] requiredColor = null) where T : Element
     {
         // Find all chunks that contain the specified particle type
         var relevantChunks = new HashSet<Vector2Int>();
@@ -2384,21 +2433,53 @@ public static class EdgeConnectionChecker
         return false;
     }
 
-    private static bool ColorMatches(Element element, Color? requiredColor)
+    private static bool ColorMatches(Element element, Color[] requiredColors, bool useLocal = true)
     {
-        if (!requiredColor.HasValue) return true; // No color requirement
-        if (!element.useCustomColorData) return true; // Element doesn't use color data
+        if (!element.useCustomColorData)
+        {
+            Debug.Log("element doesn't support color");
+            return true; // Element doesn't use color data
+        }
 
-        // Check if the element's color matches the required color
-        return element.colorData.Contains(requiredColor.Value);
+        if (useLocal)
+        {
+            foreach (var color in requiredColors)
+            {
+                if (ColorsAreEqualIgnoringAlpha(element.LocalColor, color))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        else
+        {
+            foreach (var color in requiredColors)
+            {
+                if (element.colorData.Any(c => ColorsAreEqualIgnoringAlpha(c, color)))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
+
+    private static bool ColorsAreEqualIgnoringAlpha(Color color1, Color color2)
+    {
+        return Mathf.Approximately(color1.r, color2.r) &&
+               Mathf.Approximately(color1.g, color2.g) &&
+               Mathf.Approximately(color1.b, color2.b);
+    }
+
+
 
     private static bool PathExistsToRightEdge<T>(
         (Vector2Int chunkPos, Vector2Int localPos) current,
         Dictionary<Vector2Int, Chunk> chunks,
         int maxX,
         HashSet<(Vector2Int chunkPos, Vector2Int localPos)> visited,
-        Color? requiredColor) where T : Element
+        Color[] requiredColor) where T : Element
     {
         var queue = new Queue<(Vector2Int chunkPos, Vector2Int localPos)>();
         queue.Enqueue(current);
@@ -2477,7 +2558,7 @@ public static class EdgeConnectionChecker
     }
 
     // Helper method to check if a specific colored line exists
-    public static bool CheckColoredTypeConnectsBorders<T>(Dictionary<Vector2Int, Chunk> chunks, Color color) where T : Element
+    public static bool CheckColoredTypeConnectsBorders<T>(Dictionary<Vector2Int, Chunk> chunks, Color[] color) where T : Element
     {
         return CheckTypeConnectsBorders<T>(chunks, color);
     }
