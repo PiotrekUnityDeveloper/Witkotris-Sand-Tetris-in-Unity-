@@ -185,6 +185,7 @@ MonoBehaviour:
   showActiveChunks: 1
   renderElements: 0
   sampleSprite: {fileID: 21300000, guid: 74173d49af0cd4741917ef64e45c09a1, type: 3}
+  sampleColor: {r: 0.1462264, g: 0.45365423, b: 1, a: 0}
 --- !u!4 &322835529
 Transform:
   m_ObjectHideFlags: 0

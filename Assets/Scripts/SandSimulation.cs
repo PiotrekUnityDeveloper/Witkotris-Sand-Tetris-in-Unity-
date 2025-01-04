@@ -359,19 +359,20 @@ public class SandSimulation : MonoBehaviour
     }
 
     public Sprite sampleSprite;
+    public Color sampleColor = Color.white;
 
     public void CreateSimObject()
     {
         Vector2 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
         // Add detailed debug logging
-        Debug.Log($"Raw Mouse World Position: {mouseWorldPos}");
-        Debug.Log($"Chunk Size: {chunkSize}");
+        //Debug.Log($"Raw Mouse World Position: {mouseWorldPos}");
+        //Debug.Log($"Chunk Size: {chunkSize}");
 
         // Calculate and log intermediate values
         float preChunkX = mouseWorldPos.x / chunkSize;
         float preChunkY = mouseWorldPos.y / chunkSize;
-        Debug.Log($"Pre-floor chunk calculation: ({preChunkX}, {preChunkY})");
+        //Debug.Log($"Pre-floor chunk calculation: ({preChunkX}, {preChunkY})");
 
         Vector2Int chunkPos = new Vector2Int(
             Mathf.FloorToInt(mouseWorldPos.x),  // Not dividing by chunkSize
@@ -387,20 +388,21 @@ public class SandSimulation : MonoBehaviour
         if (localPos.x < 0) localPos.x += chunkSize;
         if (localPos.y < 0) localPos.y += chunkSize;
 
-        Debug.Log($"Final Chunk Position: {chunkPos}");
-        Debug.Log($"Final Local Position: {localPos}");
+        //Debug.Log($"Final Chunk Position: {chunkPos}");
+        //Debug.Log($"Final Local Position: {localPos}");
 
         // Log all active chunks before adding new one
+        /*
         Debug.Log("Currently Active Chunks:");
         foreach (var chunk in chunks.Where(c => c.Value.isActive))
         {
             Debug.Log($"Active chunk at: {chunk.Key}");
-        }
+        }*/
 
         WitkotrisBlock newBlock = new WitkotrisBlock(mouseWorldPos);
         newBlock._objectChunkPos = chunkPos;
         newBlock._objectLocalPos = localPos;
-
+        newBlock.tileColor = sampleColor;
         newBlock.elementType = "sand";
         newBlock.tileShapeSprite = sampleSprite;
         newBlock.InitializeBlock();
@@ -408,13 +410,13 @@ public class SandSimulation : MonoBehaviour
 
         if (chunks.ContainsKey(chunkPos))
         {
-            Debug.Log($"Activating chunk at: {chunkPos}");
+            //Debug.Log($"Activating chunk at: {chunkPos}");
             chunks[chunkPos].isActive = true;
             chunks[chunkPos].isActiveNextFrame = true;
         }
         else
         {
-            Debug.Log($"WARNING: No chunk found at position: {chunkPos}");
+            //Debug.Log($"WARNING: No chunk found at position: {chunkPos}");
         }
     }
 
@@ -1081,6 +1083,7 @@ public class SandSimulation : MonoBehaviour
         }
 
         public string elementType = null;
+        public Color tileColor = Color.white;
         public Sprite tileShapeSprite = null;
         private bool initialized = false;
 
@@ -1157,6 +1160,17 @@ public class SandSimulation : MonoBehaviour
             if (localPos.x < 0) localPos.x += SandSimulation.Instance.chunkSize;
             if (localPos.y < 0) localPos.y += SandSimulation.Instance.chunkSize;
 
+            //process the color
+            float brightness = (color.r + color.g + color.b) / 3f;  // Simple average for brightness
+
+            // Create a modified color based on the pixel brightness and tileColor
+            Color finalColor = new Color(
+                tileColor.r * brightness,
+                tileColor.g * brightness,
+                tileColor.b * brightness,
+                tileColor.a
+            );
+
             if (elementType == "sand")
             {
                 Sand e_sand = new Sand(localPos, chunkPos);
@@ -1170,7 +1184,7 @@ public class SandSimulation : MonoBehaviour
                 e_sand.localPosition = adjustedLocal;
                 e_sand.chunkPosition = chunkPos;
                 e_sand.useCustomColorData = true;
-                e_sand.LocalColor = color;
+                e_sand.LocalColor = finalColor;
                 e_sand.containedInObject = true;
                 e_sand.containingObject = this;
 
