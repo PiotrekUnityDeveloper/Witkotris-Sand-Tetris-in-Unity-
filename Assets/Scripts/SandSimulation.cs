@@ -363,42 +363,43 @@ public class SandSimulation : MonoBehaviour
     public void CreateSimObject()
     {
         Vector2 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-        Debug.Log($"Mouse World Pos: {mouseWorldPos}");
 
-        Vector2 checkPos = new Vector2(
-                    mouseWorldPos.x / (float)chunkSize,
-                    mouseWorldPos.y / (float)chunkSize
-                );
+        // Add detailed debug logging
+        Debug.Log($"Raw Mouse World Position: {mouseWorldPos}");
+        Debug.Log($"Chunk Size: {chunkSize}");
 
-        Vector2Int cellPos = new Vector2Int(
-                    Mathf.FloorToInt(checkPos.x),
-                    Mathf.FloorToInt(checkPos.y)
-                );
+        // Calculate and log intermediate values
+        float preChunkX = mouseWorldPos.x / chunkSize;
+        float preChunkY = mouseWorldPos.y / chunkSize;
+        Debug.Log($"Pre-floor chunk calculation: ({preChunkX}, {preChunkY})");
 
         Vector2Int chunkPos = new Vector2Int(
-            Mathf.FloorToInt(cellPos.x),
-            Mathf.FloorToInt(cellPos.y)
+            Mathf.FloorToInt(mouseWorldPos.x),  // Not dividing by chunkSize
+            Mathf.FloorToInt(mouseWorldPos.y)
         );
-
-        //chunkPos = (Vector2Int)SandSimulation.Instance.boundaryTilemap.WorldToCell(mouseWorldPos);
 
         Vector2Int localPos = new Vector2Int(
-            Mathf.RoundToInt(chunkPos.x * chunkSize),
-            Mathf.RoundToInt(chunkPos.y * chunkSize)
+            Mathf.FloorToInt(mouseWorldPos.x) % chunkSize,
+            Mathf.FloorToInt(mouseWorldPos.y) % chunkSize
         );
-        Debug.Log($"Pre-clamp Local Pos: {localPos}");
 
-        // Clamp local position to chunk bounds
-        localPos.x = Mathf.Clamp(localPos.x, 0, chunkSize - 1);
-        localPos.y = Mathf.Clamp(localPos.y, 0, chunkSize - 1);
-        Debug.Log($"Final Local Pos: {localPos}");
+        // Handle negative coordinates
+        if (localPos.x < 0) localPos.x += chunkSize;
+        if (localPos.y < 0) localPos.y += chunkSize;
 
-        // Create block using the raw mouse world position 
+        Debug.Log($"Final Chunk Position: {chunkPos}");
+        Debug.Log($"Final Local Position: {localPos}");
+
+        // Log all active chunks before adding new one
+        Debug.Log("Currently Active Chunks:");
+        foreach (var chunk in chunks.Where(c => c.Value.isActive))
+        {
+            Debug.Log($"Active chunk at: {chunk.Key}");
+        }
+
         WitkotrisBlock newBlock = new WitkotrisBlock(mouseWorldPos);
         newBlock._objectChunkPos = chunkPos;
         newBlock._objectLocalPos = localPos;
-        Debug.Log($"Block Object Position: {newBlock.objectPosition}");
-        Debug.Log($"Block Chunk Pos: {newBlock._objectChunkPos}, Local Pos: {newBlock._objectLocalPos}");
 
         newBlock.elementType = "sand";
         newBlock.tileShapeSprite = sampleSprite;
@@ -407,8 +408,13 @@ public class SandSimulation : MonoBehaviour
 
         if (chunks.ContainsKey(chunkPos))
         {
+            Debug.Log($"Activating chunk at: {chunkPos}");
             chunks[chunkPos].isActive = true;
             chunks[chunkPos].isActiveNextFrame = true;
+        }
+        else
+        {
+            Debug.Log($"WARNING: No chunk found at position: {chunkPos}");
         }
     }
 
@@ -419,6 +425,8 @@ public class SandSimulation : MonoBehaviour
             Debug.LogWarning($"Attempted to evacuate non-existent chunk at {chunkPosition}");
             return;
         }
+
+        Debug.LogWarning($"Evacuating chunk at {chunkPosition}");
 
         Chunk sourceChunk = chunks[chunkPosition];
 
@@ -1126,8 +1134,8 @@ public class SandSimulation : MonoBehaviour
 
             // Calculate world position for this pixel
             Vector2 worldPos = new Vector2(
-                this.objectPosition.Value.x + x,
-                this.objectPosition.Value.y + y
+                this.objectPosition.Value.x * SandSimulation.Instance.chunkSize + x,
+                this.objectPosition.Value.y * SandSimulation.Instance.chunkSize + y
             );
 
             // Calculate correct chunk position
@@ -1141,6 +1149,9 @@ public class SandSimulation : MonoBehaviour
                 Mathf.FloorToInt(worldPos.x) % SandSimulation.Instance.chunkSize,
                 Mathf.FloorToInt(worldPos.y) % SandSimulation.Instance.chunkSize
             );
+
+            //chunkPos = _objectChunkPos;
+            //localPos = _objectLocalPos - new Vector2Int(x, y);
 
             // Handle negative coordinates
             if (localPos.x < 0) localPos.x += SandSimulation.Instance.chunkSize;
