@@ -1328,7 +1328,7 @@ public class SandSimulation : MonoBehaviour
                     Sand sand = element as Sand;
                     Vector2Int chunkPOS = sand.chunkPosition;
                     Vector2Int unadjustedPos = new Vector2Int(sand.localPosition.x, sand.localPosition.y - 1);
-                    Vector2Int relativeObjPos = new Vector2Int(0, -1);
+                    Vector2 relativeObjPos = new Vector2Int(0, -1);
                     Vector2Int targetPos = sand.AdjustPositionForChunk(
                         new Vector2Int(sand.localPosition.x, sand.localPosition.y - 1),
                         ref chunkPOS,
@@ -1354,7 +1354,8 @@ public class SandSimulation : MonoBehaviour
                             if (isEmpty && sandChunk != null)
                             {
                                 sand.MoveToNewPositionCST(targetPos, chunkPOS, sandChunk, targetChunkObject, sand.localPosition);
-                                this.objectPosition += relativeObjPos / SandSimulation.Instance.chunkSize;
+                                this.objectPosition += (relativeObjPos / SandSimulation.Instance.chunkSize) / this.containedElements.Count;
+                                //print(this.objectPosition.ToString() + " (removed: " + (relativeObjPos / SandSimulation.Instance.chunkSize) + ")");
                             }
                             else if (!isEmpty)
                             {
