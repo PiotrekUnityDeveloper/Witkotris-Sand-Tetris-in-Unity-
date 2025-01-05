@@ -102,6 +102,11 @@ public class SandSimulation : MonoBehaviour
         {
             CreateSimObject();
         }
+
+        if(enableDrawing && Input.GetKeyDown(KeyCode.R))
+        {
+            RotateSimObject();
+        }
     }
 
     public void CheckForClearLine()
@@ -437,6 +442,7 @@ public class SandSimulation : MonoBehaviour
         }*/
 
         WitkotrisBlock newBlock = new WitkotrisBlock(mouseWorldPos);
+        currentTile = newBlock;
         newBlock._objectChunkPos = chunkPos;
         newBlock._objectLocalPos = localPos;
         newBlock.tileColor = sampleColor;
@@ -454,6 +460,17 @@ public class SandSimulation : MonoBehaviour
         else
         {
             //Debug.Log($"WARNING: No chunk found at position: {chunkPos}");
+        }
+    }
+
+    [HideInInspector] public SimulationObject currentTile;
+
+    public void RotateSimObject()
+    {
+        if(currentTile != null && ((WitkotrisBlock)currentTile).isGranularized == false)
+        {
+            //rotate the tile
+            ((WitkotrisBlock)currentTile).RotateClockwise();
         }
     }
 
@@ -1310,6 +1327,8 @@ public class SandSimulation : MonoBehaviour
                 {
                     Sand sand = element as Sand;
                     Vector2Int chunkPOS = sand.chunkPosition;
+                    Vector2Int unadjustedPos = new Vector2Int(sand.localPosition.x, sand.localPosition.y - 1);
+                    Vector2Int relativeObjPos = new Vector2Int(0, -1);
                     Vector2Int targetPos = sand.AdjustPositionForChunk(
                         new Vector2Int(sand.localPosition.x, sand.localPosition.y - 1),
                         ref chunkPOS,
@@ -1335,6 +1354,7 @@ public class SandSimulation : MonoBehaviour
                             if (isEmpty && sandChunk != null)
                             {
                                 sand.MoveToNewPositionCST(targetPos, chunkPOS, sandChunk, targetChunkObject, sand.localPosition);
+                                this.objectPosition += relativeObjPos / SandSimulation.Instance.chunkSize;
                             }
                             else if (!isEmpty)
                             {
@@ -1351,6 +1371,8 @@ public class SandSimulation : MonoBehaviour
             
         }
 
+        public bool isGranularized = false;
+
         public void Granularize()
         {
             foreach(Element e in containedElements)
@@ -1359,7 +1381,184 @@ public class SandSimulation : MonoBehaviour
                 e.containingObject = null;
             }
 
+            isGranularized = true;
             SandSimulation.Instance.simObjects.Remove(this);
+        }
+
+        // Handling Rotation
+
+        private Vector2 CalculateCenter()
+        {
+            if (containedElements.Count == 0) return objectPosition ?? Vector2.zero;
+
+            float minX = float.MaxValue, minY = float.MaxValue;
+            float maxX = float.MinValue, maxY = float.MinValue;
+
+            foreach (Element element in containedElements)
+            {
+                Vector2 worldPos = new Vector2(
+                    element.chunkPosition.x * SandSimulation.Instance.chunkSize + element.localPosition.x,
+                    element.chunkPosition.y * SandSimulation.Instance.chunkSize + element.localPosition.y
+                );
+
+                minX = Mathf.Min(minX, worldPos.x);
+                minY = Mathf.Min(minY, worldPos.y);
+                maxX = Mathf.Max(maxX, worldPos.x);
+                maxY = Mathf.Max(maxY, worldPos.y);
+            }
+
+            return new Vector2((minX + maxX) / 2f, (minY + maxY) / 2f);
+        }
+
+        private Sprite RotateSprite(Sprite originalSprite, bool clockwise)
+        {
+            Texture2D originalTexture = originalSprite.texture;
+            Rect rect = originalSprite.textureRect;
+
+            // Convert rect to pixel coordinates
+            int xStart = Mathf.RoundToInt(rect.x);
+            int yStart = Mathf.RoundToInt(rect.y);
+            int width = Mathf.RoundToInt(rect.width);
+            int height = Mathf.RoundToInt(rect.height);
+
+            // Create a new texture for the rotated sprite
+            Texture2D rotatedTexture = new Texture2D(height, width);
+
+            // Rotate the pixels
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Color pixel = originalTexture.GetPixel(xStart + x, yStart + y);
+
+                    // For clockwise rotation: new_x = y, new_y = width - 1 - x
+                    // For counterclockwise rotation: new_x = height - 1 - y, new_y = x
+                    if (clockwise)
+                    {
+                        rotatedTexture.SetPixel(height - 1 - y, x, pixel);
+                    }
+                    else
+                    {
+                        rotatedTexture.SetPixel(y, width - 1 - x, pixel);
+                    }
+                }
+            }
+
+            rotatedTexture.Apply();
+
+            // Create a new sprite from the rotated texture
+            return Sprite.Create(rotatedTexture,
+                new Rect(0, 0, rotatedTexture.width, rotatedTexture.height),
+                new Vector2(0.5f, 0.5f));
+        }
+
+        public bool RotateClockwise()
+        {
+            if (!initialized || tileShapeSprite == null) return false;
+
+            // Store the current position
+            Vector2 currentPos = objectPosition ?? Vector2.zero;
+
+            // Clear existing elements but remember their positions
+            HashSet<(Vector2Int chunk, Vector2Int local)> oldPositions = new HashSet<(Vector2Int, Vector2Int)>();
+            foreach (Element element in containedElements)
+            {
+                oldPositions.Add((element.chunkPosition, element.localPosition));
+                if (SandSimulation.Instance.chunks.TryGetValue(element.chunkPosition, out Chunk chunk))
+                {
+                    chunk.elements[element.localPosition.x, element.localPosition.y] = null;
+                }
+            }
+
+            containedElements.Clear();
+
+            // Rotate the sprite
+            Sprite rotatedSprite = RotateSprite(tileShapeSprite, true);
+
+            // Store the original sprite
+            Sprite originalSprite = tileShapeSprite;
+
+            // Temporarily set the rotated sprite
+            tileShapeSprite = rotatedSprite;
+
+            // Try to create new elements at the rotated positions
+            ProcessSpritePixels(rotatedSprite);
+
+            // Check if any new positions are blocked
+            bool positionBlocked = false;
+            foreach (Element element in containedElements)
+            {
+                if (!IsPositionValid(element.chunkPosition, element.localPosition, oldPositions))
+                {
+                    //positionBlocked = true;
+                    break;
+                }
+            }
+
+            if (positionBlocked)
+            {
+                // Rotation failed - restore original state
+                containedElements.Clear();
+                tileShapeSprite = originalSprite;
+                ProcessSpritePixels(originalSprite);
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool IsPositionValid(Vector2Int chunkPos, Vector2Int localPos, HashSet<(Vector2Int, Vector2Int)> excludePositions)
+        {
+            // Skip check for positions that were occupied by our elements before rotation
+            if (excludePositions.Contains((chunkPos, localPos)))
+            {
+                return true;
+            }
+
+            // Check if chunk exists
+            if (!SandSimulation.Instance.chunks.TryGetValue(chunkPos, out Chunk chunk))
+            {
+                return false;
+            }
+
+            // Check collision with tilemap
+            Vector3Int tilePos = new Vector3Int(
+                chunkPos.x * SandSimulation.Instance.chunkSize + localPos.x,
+                chunkPos.y * SandSimulation.Instance.chunkSize + localPos.y,
+                0
+            );
+
+            if (SandSimulation.Instance.collisionTilemap.HasTile(tilePos))
+            {
+                return false;
+            }
+
+            // Check if position is occupied by another element
+            Element existingElement = chunk.elements[localPos.x, localPos.y];
+            return existingElement == null || containedElements.Contains(existingElement);
+        }
+
+        
+
+        private void MoveElement(Element element, Vector2Int newChunkPos, Vector2Int newLocalPos)
+        {
+            // Remove from old chunk
+            if (SandSimulation.Instance.chunks.TryGetValue(element.chunkPosition, out Chunk oldChunk))
+            {
+                oldChunk.elements[element.localPosition.x, element.localPosition.y] = null;
+            }
+
+            // Add to new chunk
+            if (SandSimulation.Instance.chunks.TryGetValue(newChunkPos, out Chunk newChunk))
+            {
+                element.chunkPosition = newChunkPos;
+                element.localPosition = newLocalPos;
+                newChunk.AddCustomElement(newLocalPos, element);
+
+                // Keep chunks active
+                newChunk.isActive = true;
+                newChunk.isActiveNextFrame = true;
+            }
         }
     }
 
