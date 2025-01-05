@@ -212,6 +212,10 @@ MonoBehaviour:
   simulationRenderer: {fileID: 322835527}
   collisionTilemap: {fileID: 2049313305}
   boundaryTilemap: {fileID: 656367398}
+  defaultFallSpeed: 1
+  fastForwardSpeed: 2
+  fallSpeed: 1
+  horizontalSpeed: 1
   drawDebug: 1
   renderChunkBorders: 0
   showActiveChunks: 1
