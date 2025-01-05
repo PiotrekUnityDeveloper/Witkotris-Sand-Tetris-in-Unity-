@@ -129,14 +129,28 @@ public class SandSimulation : MonoBehaviour
 
     public IEnumerator CheckForClearLineLoop()
     {
-        bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, targetColorData);
+        HashSet<(Vector2Int, Vector2Int)> foundSandElements = new HashSet<(Vector2Int, Vector2Int)>();
+        bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, out foundSandElements, targetColorData);
         if(isConnectedSand) print("connected sand!");
 
-        bool isConnectedBlueSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, blueColorData);
+        HashSet<(Vector2Int, Vector2Int)> foundBlueElements = new HashSet<(Vector2Int, Vector2Int)>();
+        bool isConnectedBlueSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, out foundBlueElements, blueColorData);
         if (isConnectedBlueSand) print("connected bluesand!");
+
+        HashSet<(Vector2Int, Vector2Int)> combined = new HashSet<(Vector2Int, Vector2Int)>(foundSandElements.Union(foundBlueElements));
+        ClearLine(combined);
 
         yield return new WaitForSecondsRealtime(2f);
         StartCoroutine(CheckForClearLineLoop());
+    }
+
+    public void ClearLine(HashSet<(Vector2Int, Vector2Int)> elementsToRemove)
+    {
+        foreach (var (chunkPos, localPos) in elementsToRemove)
+        {
+            Chunk chunk = chunks[chunkPos];
+            chunk.elements[localPos.x, localPos.y] = null;
+        }
     }
 
     // INPUT LOGIC
@@ -2382,14 +2396,18 @@ public static class SimulationCoordinateConverter
 
 public static class EdgeConnectionChecker
 {
-    public static bool CheckTypeConnectsBorders<T>(Dictionary<Vector2Int, Chunk> chunks, Color[] requiredColor = null) where T : Element
+    public static bool CheckTypeConnectsBorders<T>(
+        Dictionary<Vector2Int, Chunk> chunks,
+        out HashSet<(Vector2Int chunkPos, Vector2Int localPos)> connectedElements,
+        Color[] requiredColors = null) where T : Element
     {
-        // Find all chunks that contain the specified particle type
+        connectedElements = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
+
+        // Rest of the initial setup remains the same...
         var relevantChunks = new HashSet<Vector2Int>();
         var minX = int.MaxValue;
         var maxX = int.MinValue;
 
-        // First pass: find chunks with the particle type and world boundaries
         foreach (var kvp in chunks)
         {
             if (kvp.Value.HasParticleType<T>())
@@ -2402,16 +2420,15 @@ public static class EdgeConnectionChecker
 
         if (relevantChunks.Count == 0) return false;
 
-        // Find particles touching the left edge
+        // Find starting points that match ANY of the required colors
         var startingPoints = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
         foreach (var chunkPos in relevantChunks.Where(c => c.x == minX))
         {
             var chunk = chunks[chunkPos];
-            // Check leftmost column of the chunk
             for (int y = 0; y < chunk.chunkSize; y++)
             {
                 var element = chunk.elements[0, y] as T;
-                if (element != null && ColorMatches(element, requiredColor))
+                if (element != null && ColorMatches(element, requiredColors))
                 {
                     startingPoints.Add((chunkPos, new Vector2Int(0, y)));
                 }
@@ -2420,20 +2437,111 @@ public static class EdgeConnectionChecker
 
         if (startingPoints.Count == 0) return false;
 
-        // For each starting point, try to find a path to the right edge
+        // Modified to combine results from multiple paths
+        var allConnectedElements = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
+
         foreach (var start in startingPoints)
         {
             var visited = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
-            if (PathExistsToRightEdge<T>(start, chunks, maxX, visited, requiredColor))
+            if (PathExistsToRightEdge<T>(start, chunks, maxX, visited, requiredColors, out var initialPath))
             {
-                return true;
+                var connectedForThisPath = FloodFillFromPath<T>(chunks, initialPath, requiredColors);
+                allConnectedElements.UnionWith(connectedForThisPath);
             }
+        }
+
+        if (allConnectedElements.Count > 0)
+        {
+            connectedElements = allConnectedElements;
+            return true;
         }
 
         return false;
     }
 
-    private static bool ColorMatches(Element element, Color[] requiredColors, bool useLocal = true)
+    private static HashSet<(Vector2Int chunkPos, Vector2Int localPos)> FloodFillFromPath<T>(
+        Dictionary<Vector2Int, Chunk> chunks,
+        HashSet<(Vector2Int chunkPos, Vector2Int localPos)> initialPath,
+        Color[] requiredColors) where T : Element
+    {
+        var allConnected = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
+        var queue = new Queue<(Vector2Int chunkPos, Vector2Int localPos)>();
+
+        foreach (var point in initialPath)
+        {
+            if (!allConnected.Contains(point))
+            {
+                queue.Enqueue(point);
+                allConnected.Add(point);
+            }
+        }
+
+        while (queue.Count > 0)
+        {
+            var (currentChunkPos, currentLocalPos) = queue.Dequeue();
+            var currentChunk = chunks[currentChunkPos];
+
+            Vector2Int[] directions = new Vector2Int[]
+            {
+                new Vector2Int(1, 0),   // right
+                new Vector2Int(-1, 0),  // left
+                new Vector2Int(0, 1),   // up
+                new Vector2Int(0, -1),  // down
+                new Vector2Int(1, 1),   // up-right
+                new Vector2Int(1, -1),  // down-right
+                new Vector2Int(-1, 1),  // up-left
+                new Vector2Int(-1, -1), // down-left
+            };
+
+            foreach (var dir in directions)
+            {
+                var nextLocalPos = currentLocalPos + dir;
+                var nextChunkPos = currentChunkPos;
+
+                // Handle chunk boundaries
+                if (nextLocalPos.x >= currentChunk.chunkSize)
+                {
+                    nextLocalPos.x = 0;
+                    nextChunkPos.x += 1;
+                }
+                else if (nextLocalPos.x < 0)
+                {
+                    nextLocalPos.x = currentChunk.chunkSize - 1;
+                    nextChunkPos.x -= 1;
+                }
+
+                if (nextLocalPos.y >= currentChunk.chunkSize)
+                {
+                    nextLocalPos.y = 0;
+                    nextChunkPos.y += 1;
+                }
+                else if (nextLocalPos.y < 0)
+                {
+                    nextLocalPos.y = currentChunk.chunkSize - 1;
+                    nextChunkPos.y -= 1;
+                }
+
+                var nextPos = (nextChunkPos, nextLocalPos);
+
+                if (allConnected.Contains(nextPos) || !chunks.ContainsKey(nextChunkPos))
+                    continue;
+
+                var nextChunk = chunks[nextChunkPos];
+                var nextElement = nextChunk.elements[nextLocalPos.x, nextLocalPos.y] as T;
+
+                // Modified to check against all required colors
+                if (nextElement != null && ColorMatches(nextElement, requiredColors, false))
+                {
+                    queue.Enqueue(nextPos);
+                    allConnected.Add(nextPos);
+                }
+            }
+        }
+
+        return allConnected;
+    }
+
+    private static bool ColorMatches(Element element, Color[] requiredColors, bool useLocal = false)
     {
         if (!element.useCustomColorData)
         {
@@ -2479,9 +2587,13 @@ public static class EdgeConnectionChecker
         Dictionary<Vector2Int, Chunk> chunks,
         int maxX,
         HashSet<(Vector2Int chunkPos, Vector2Int localPos)> visited,
-        Color[] requiredColor) where T : Element
+        Color[] requiredColor,
+        out HashSet<(Vector2Int chunkPos, Vector2Int localPos)> initialPath) where T : Element
     {
+        initialPath = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
         var queue = new Queue<(Vector2Int chunkPos, Vector2Int localPos)>();
+        var pathParent = new Dictionary<(Vector2Int chunkPos, Vector2Int localPos), (Vector2Int chunkPos, Vector2Int localPos)>();
+
         queue.Enqueue(current);
         visited.Add(current);
 
@@ -2493,6 +2605,14 @@ public static class EdgeConnectionChecker
             // Check if we reached the right edge
             if (currentChunkPos.x == maxX && currentLocalPos.x == currentChunk.chunkSize - 1)
             {
+                // Reconstruct the initial path
+                var pathPoint = (currentChunkPos, currentLocalPos);
+                while (pathParent.ContainsKey(pathPoint))
+                {
+                    initialPath.Add(pathPoint);
+                    pathPoint = pathParent[pathPoint];
+                }
+                initialPath.Add(current); // Add the starting point
                 return true;
             }
 
@@ -2550,6 +2670,7 @@ public static class EdgeConnectionChecker
                 {
                     queue.Enqueue(nextPos);
                     visited.Add(nextPos);
+                    pathParent[nextPos] = (currentChunkPos, currentLocalPos);
                 }
             }
         }
@@ -2558,9 +2679,12 @@ public static class EdgeConnectionChecker
     }
 
     // Helper method to check if a specific colored line exists
-    public static bool CheckColoredTypeConnectsBorders<T>(Dictionary<Vector2Int, Chunk> chunks, Color[] color) where T : Element
+    public static bool CheckColoredTypeConnectsBorders<T>(
+        Dictionary<Vector2Int, Chunk> chunks, 
+        Color[] color,
+        out HashSet<(Vector2Int chunkPos, Vector2Int localPos)> connectedElements) where T : Element
     {
-        return CheckTypeConnectsBorders<T>(chunks, color);
+        return CheckTypeConnectsBorders<T>(chunks, out connectedElements, color);
     }
 }
 
