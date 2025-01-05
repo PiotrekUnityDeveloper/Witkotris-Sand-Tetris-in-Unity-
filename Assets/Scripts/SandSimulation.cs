@@ -1,8 +1,10 @@
+using JetBrains.Annotations;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Xml;
 using Unity.Mathematics;
 using Unity.VisualScripting;
@@ -16,6 +18,7 @@ public class SandSimulation : MonoBehaviour
 {
     public static SandSimulation Instance { get; set; }
     public readonly System.Random globalRandom = new System.Random();
+
 
     public enum ChunkGenerationMode
     {
@@ -40,17 +43,24 @@ public class SandSimulation : MonoBehaviour
     public ChunkUpdateMode chunkUpdateMode = ChunkUpdateMode.Sequential;
 
     [Header("Interaction Settings")]
-    public bool enableDrawing = false;
+    public bool enableInteraction = false;
     public string selectedElement = "sand";
     [Range(0, 15)] public float drawingBrushSize = 0;
     public bool interactionUpdatesEnvironment = true;
 
     [Header("References")]
+    public GameManager gameManager;
     public SimulationRenderer simulationRenderer;
     public Tilemap collisionTilemap;
     public Tilemap boundaryTilemap;
     [HideInInspector] public Dictionary<Vector2Int, Chunk> chunks = new Dictionary<Vector2Int, Chunk>();
     [HideInInspector] public List<SimulationObject> simObjects = new List<SimulationObject>();
+
+    [Header("Engine Excluded")]
+    public int defaultFallSpeed = 1;
+    public int fastForwardSpeed = 2;
+    [HideInInspector] public int fallSpeed = 1;
+    public int horizontalSpeed = 2;
 
     [Header("Debug")]
     public bool drawDebug = false;
@@ -83,29 +93,29 @@ public class SandSimulation : MonoBehaviour
             }
         }
 
-        if (enableDrawing && Input.GetMouseButton(0))
+        if (enableInteraction && Input.GetMouseButton(0))
         {
             CreateElementsAtMousePos();
         }
 
-        if (enableDrawing && Input.GetMouseButton(1))
+        if (enableInteraction && Input.GetMouseButton(1))
         {
             DiscardElementsAtMousePos();
         }
 
-        if (enableDrawing && Input.GetMouseButtonDown(2))
+        if (enableInteraction && Input.GetMouseButtonDown(2))
         {
             EvacutableElementsAtMousePos();
         }
 
-        if (enableDrawing && Input.GetMouseButtonDown(3))
+        if (enableInteraction && Input.GetMouseButtonDown(3))
         {
-            CreateSimObject();
+            //CreateSimObject();
         }
 
-        if(enableDrawing && Input.GetKeyDown(KeyCode.R))
+        if(enableInteraction && Input.GetKeyDown(KeyCode.R))
         {
-            RotateSimObject();
+            //RotateSimObject();
         }
     }
 
@@ -400,10 +410,65 @@ public class SandSimulation : MonoBehaviour
         }
     }
 
-    public Sprite sampleSprite;
-    public Color sampleColor = Color.white;
+    public void CreateSimObject(Vector2 objPos, Sprite objSprite, Color objColor) // the color for blending
+    {
+        // Add detailed debug logging
+        //Debug.Log($"Raw Mouse World Position: {mouseWorldPos}");
+        //Debug.Log($"Chunk Size: {chunkSize}");
 
-    public void CreateSimObject()
+        // Calculate and log intermediate values
+        float preChunkX = objPos.x / chunkSize;
+        float preChunkY = objPos.y / chunkSize;
+        //Debug.Log($"Pre-floor chunk calculation: ({preChunkX}, {preChunkY})");
+
+        Vector2Int chunkPos = new Vector2Int(
+            Mathf.FloorToInt(objPos.x),  // Not dividing by chunkSize
+            Mathf.FloorToInt(objPos.y)
+        );
+
+        Vector2Int localPos = new Vector2Int(
+            Mathf.FloorToInt(objPos.x) % chunkSize,
+            Mathf.FloorToInt(objPos.y) % chunkSize
+        );
+
+        // Handle negative coordinates
+        if (localPos.x < 0) localPos.x += chunkSize;
+        if (localPos.y < 0) localPos.y += chunkSize;
+
+        //Debug.Log($"Final Chunk Position: {chunkPos}");
+        //Debug.Log($"Final Local Position: {localPos}");
+
+        // Log all active chunks before adding new one
+        /*
+        Debug.Log("Currently Active Chunks:");
+        foreach (var chunk in chunks.Where(c => c.Value.isActive))
+        {
+            Debug.Log($"Active chunk at: {chunk.Key}");
+        }*/
+
+        WitkotrisBlock newBlock = new WitkotrisBlock(objPos);
+        currentTile = newBlock;
+        newBlock._objectChunkPos = chunkPos;
+        newBlock._objectLocalPos = localPos;
+        newBlock.tileColor = objColor;
+        newBlock.elementType = "sand";
+        newBlock.tileShapeSprite = objSprite;
+        newBlock.InitializeBlock();
+        simObjects.Add(newBlock);
+
+        if (chunks.ContainsKey(chunkPos))
+        {
+            //Debug.Log($"Activating chunk at: {chunkPos}");
+            chunks[chunkPos].isActive = true;
+            chunks[chunkPos].isActiveNextFrame = true;
+        }
+        else
+        {
+            //Debug.Log($"WARNING: No chunk found at position: {chunkPos}");
+        }
+    }
+
+    public void CreateSimObjectAtMousePos(Sprite objSprite, Color objColor) // the color for blending
     {
         Vector2 mouseWorldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
@@ -445,9 +510,9 @@ public class SandSimulation : MonoBehaviour
         currentTile = newBlock;
         newBlock._objectChunkPos = chunkPos;
         newBlock._objectLocalPos = localPos;
-        newBlock.tileColor = sampleColor;
+        newBlock.tileColor = objColor;
         newBlock.elementType = "sand";
-        newBlock.tileShapeSprite = sampleSprite;
+        newBlock.tileShapeSprite = objSprite;
         newBlock.InitializeBlock();
         simObjects.Add(newBlock);
 
@@ -472,6 +537,41 @@ public class SandSimulation : MonoBehaviour
             //rotate the tile
             ((WitkotrisBlock)currentTile).RotateClockwise();
         }
+    }
+
+    public void MoveTileRight()
+    {
+        if (currentTile != null && ((WitkotrisBlock)currentTile).isGranularized == false)
+        {
+            ((WitkotrisBlock)currentTile).moveRight = true;
+        }
+    }
+
+    public void MoveTileLeft()
+    {
+        if (currentTile != null && ((WitkotrisBlock)currentTile).isGranularized == false)
+        {
+            ((WitkotrisBlock)currentTile).moveLeft = true;
+        }
+    }
+
+    public void StopTileMovement()
+    {
+        if (currentTile != null)
+        {
+            ((WitkotrisBlock)currentTile).moveRight = false;
+            ((WitkotrisBlock)currentTile).moveLeft = false;
+        }
+    }
+
+    public void FastForwardFall()
+    {
+        this.fallSpeed = this.fastForwardSpeed;
+    }
+
+    public void StopFastFall()
+    {
+        this.fallSpeed = this.defaultFallSpeed;
     }
 
     public void EvacuateChunk(Vector2Int chunkPosition)
@@ -1130,6 +1230,9 @@ public class SandSimulation : MonoBehaviour
 
     public class WitkotrisBlock : SimulationObject
     {
+        public bool moveRight = false;
+        public bool moveLeft = false;
+
         public override Vector2? objectPosition
         {
             get => base.objectPosition;
@@ -1279,7 +1382,32 @@ public class SandSimulation : MonoBehaviour
             }
             else if(elementType == "water")
             {
+                Water e_water = new Water(localPos, chunkPos);
+                Vector2Int adjustedLocal = e_water.AdjustPositionForChunk(localPos, ref chunkPos, SandSimulation.Instance.chunkSize);
 
+                /// Debug visualization
+                ///Vector3 debugWorldPos = SimulationCoordinateConverter.ChunkToWorldPosition(chunkPos, adjustedLocal,
+                ///    SandSimulation.Instance.chunkSize);
+                ///Debug.DrawLine(debugWorldPos, debugWorldPos + Vector3.forward * 0.01f, Color.red, 5.0f);
+
+                e_water.localPosition = adjustedLocal;
+                e_water.chunkPosition = chunkPos;
+                e_water.useCustomColorData = true;
+                e_water.LocalColor = finalColor;
+                //add color data for the borderedge algorithm
+                //e_sand.colorData = colorData.ToArray();
+                e_water.SetCustomColorData(colorData.ToArray());
+                e_water.containedInObject = true;
+                e_water.containingObject = this;
+
+                if (SandSimulation.Instance.chunks.TryGetValue(chunkPos, out Chunk chunkToAdd) && chunkToAdd != null)
+                {
+                    chunkToAdd.AddCustomElement(localPos, e_water);
+                    this.containedElements.Add(e_water);
+                    // Make sure the chunk is active
+                    //chunkToAdd.isActive = true;
+                    //chunkToAdd.isActiveNextFrame = true;
+                }
             }
         }
 
@@ -1327,13 +1455,47 @@ public class SandSimulation : MonoBehaviour
                 {
                     Sand sand = element as Sand;
                     Vector2Int chunkPOS = sand.chunkPosition;
-                    Vector2Int unadjustedPos = new Vector2Int(sand.localPosition.x, sand.localPosition.y - 1);
-                    Vector2 relativeObjPos = new Vector2Int(0, -1);
-                    Vector2Int targetPos = sand.AdjustPositionForChunk(
-                        new Vector2Int(sand.localPosition.x, sand.localPosition.y - 1),
+                    //Vector2Int unadjustedPos = new Vector2Int(sand.localPosition.x, sand.localPosition.y - 1);
+                    Vector2 relativeObjPos = Vector2.zero;
+
+                    if(moveRight && moveLeft) { } else if (moveRight)
+                    {
+                        relativeObjPos = new Vector2(SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
+                    }
+                    else if (moveLeft)
+                    {
+                        relativeObjPos = new Vector2(-SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
+                    }
+                    else
+                    {
+                        relativeObjPos = new Vector2(0, -SandSimulation.Instance.fallSpeed);
+                    }
+
+                    Vector2Int targetPos = Vector2Int.zero;
+                    
+                    if(moveRight & moveLeft) { } else if (moveRight)
+                    {
+                        targetPos = sand.AdjustPositionForChunk(
+                            new Vector2Int(sand.localPosition.x + SandSimulation.Instance.horizontalSpeed, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
+                            ref chunkPOS,
+                            SandSimulation.Instance.chunkSize
+                        );
+                    } else if (moveLeft)
+                    {
+                        targetPos = sand.AdjustPositionForChunk(
+                            new Vector2Int(sand.localPosition.x - SandSimulation.Instance.horizontalSpeed, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
+                            ref chunkPOS,
+                            SandSimulation.Instance.chunkSize
+                        );
+                    }
+                    else
+                    {
+                        targetPos = sand.AdjustPositionForChunk(
+                        new Vector2Int(sand.localPosition.x, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
                         ref chunkPOS,
                         SandSimulation.Instance.chunkSize
                     );
+                    }
 
                     if (SandSimulation.Instance.chunks.TryGetValue(chunkPOS, out Chunk targetChunkObject))
                     {
@@ -1382,6 +1544,13 @@ public class SandSimulation : MonoBehaviour
                 e.containingObject = null;
             }
 
+            if(SandSimulation.Instance.gameManager != null)
+            {
+                SandSimulation.Instance.gameManager.TriggerNextTile();
+            }
+
+            this.moveRight = false;
+            this.moveLeft = false;
             isGranularized = true;
             SandSimulation.Instance.simObjects.Remove(this);
         }
@@ -2433,7 +2602,7 @@ public class SandSimulation : MonoBehaviour
             }
         }
 
-        private Vector2Int AdjustPositionForChunk(Vector2Int position, ref Vector2Int chunkPos, int chunkSize)
+        public Vector2Int AdjustPositionForChunk(Vector2Int position, ref Vector2Int chunkPos, int chunkSize)
         {
             Vector2Int adjustedPos = position;
 
@@ -2463,6 +2632,7 @@ public class SandSimulation : MonoBehaviour
 
             return adjustedPos;
         }
+
     }
 
     
