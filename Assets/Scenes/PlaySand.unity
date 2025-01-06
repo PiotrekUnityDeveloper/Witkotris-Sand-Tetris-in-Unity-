@@ -212,12 +212,12 @@ MonoBehaviour:
   simulationRenderer: {fileID: 322835527}
   collisionTilemap: {fileID: 2049313305}
   boundaryTilemap: {fileID: 656367398}
-  defaultFallSpeed: 3
+  defaultFallSpeed: 2
   fastForwardSpeed: 6
   defaultFallDrag: 3
   isFastForwarding: 0
   fallSpeed: 1
-  horizontalSpeed: 1
+  horizontalSpeed: 2
   drawDebug: 1
   renderChunkBorders: 0
   showActiveChunks: 1
@@ -371,6 +371,18 @@ MonoBehaviour:
   tileShapeDefinitions:
   - tileName: Z
     tileSprite: {fileID: 21300000, guid: 74173d49af0cd4741917ef64e45c09a1, type: 3}
+  - tileName: InvertedZ
+    tileSprite: {fileID: 21300000, guid: ba6667d606abaa24993c01ec3b69d3d2, type: 3}
+  - tileName: Box
+    tileSprite: {fileID: 21300000, guid: 7973a892eafedab4f9c38b20961fb6cc, type: 3}
+  - tileName: I
+    tileSprite: {fileID: 21300000, guid: 6af2ea7ce143bbe459a66152138f625f, type: 3}
+  - tileName: InvertedL
+    tileSprite: {fileID: 21300000, guid: 40aba1f51b629c24392a324bea15494d, type: 3}
+  - tileName: L
+    tileSprite: {fileID: 21300000, guid: 7ce367c76bc35bf4aa178508212cdf37, type: 3}
+  - tileName: V
+    tileSprite: {fileID: 21300000, guid: 3b70ba5e0b53a5240b01ae63d446d906, type: 3}
 --- !u!114 &607867750
 MonoBehaviour:
   m_ObjectHideFlags: 0

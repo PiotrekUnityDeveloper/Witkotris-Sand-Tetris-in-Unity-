@@ -77,6 +77,7 @@ public class SandSimulation : MonoBehaviour
 
     void Start()
     {
+        fallSpeed = defaultFallSpeed;
         if(initOnStart) InitSimulation();
         //if (initOnStart) CheckForClearLine();
     }
