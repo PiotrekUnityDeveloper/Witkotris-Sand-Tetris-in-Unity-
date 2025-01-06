@@ -193,6 +193,7 @@ public class SandSimulation : MonoBehaviour
         {
             Chunk chunk = chunks[chunkPos];
             chunk.elements[localPos.x, localPos.y] = null;
+            chunk.isActive = true;
         }
 
         this.isSimPaused = false;
