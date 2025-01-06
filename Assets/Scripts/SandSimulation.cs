@@ -59,6 +59,8 @@ public class SandSimulation : MonoBehaviour
     [Header("Engine Excluded")]
     public int defaultFallSpeed = 1;
     public int fastForwardSpeed = 2;
+    public int defaultFallDrag = 3;
+    [HideInInspector] public bool isFastForwarding = false;
     [HideInInspector] public int fallSpeed = 1;
     public int horizontalSpeed = 2;
 
@@ -567,11 +569,13 @@ public class SandSimulation : MonoBehaviour
     public void FastForwardFall()
     {
         this.fallSpeed = this.fastForwardSpeed;
+        isFastForwarding = true;
     }
 
     public void StopFastFall()
     {
         this.fallSpeed = this.defaultFallSpeed;
+        isFastForwarding = false;
     }
 
     public void EvacuateChunk(Vector2Int chunkPosition)
@@ -1444,6 +1448,8 @@ public class SandSimulation : MonoBehaviour
 
         }
 
+        private int fallFactorCounter = 0;
+
         public override void Simulate()
         {
             if (!initialized) return;
@@ -1458,30 +1464,30 @@ public class SandSimulation : MonoBehaviour
                     //Vector2Int unadjustedPos = new Vector2Int(sand.localPosition.x, sand.localPosition.y - 1);
                     Vector2 relativeObjPos = Vector2.zero;
 
-                    if(moveRight && moveLeft) { } else if (moveRight)
+                    Vector2Int targetPos = Vector2Int.zero;
+
+                    if (moveRight && moveLeft) {
+                        relativeObjPos = new Vector2(0, -SandSimulation.Instance.fallSpeed);
+
+                        targetPos = sand.AdjustPositionForChunk(
+                            new Vector2Int(sand.localPosition.x, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
+                            ref chunkPOS,
+                            SandSimulation.Instance.chunkSize
+                        );
+                    } else if (moveRight)
                     {
                         relativeObjPos = new Vector2(SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
-                    }
-                    else if (moveLeft)
-                    {
-                        relativeObjPos = new Vector2(-SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
-                    }
-                    else
-                    {
-                        relativeObjPos = new Vector2(0, -SandSimulation.Instance.fallSpeed);
-                    }
 
-                    Vector2Int targetPos = Vector2Int.zero;
-                    
-                    if(moveRight & moveLeft) { } else if (moveRight)
-                    {
                         targetPos = sand.AdjustPositionForChunk(
                             new Vector2Int(sand.localPosition.x + SandSimulation.Instance.horizontalSpeed, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
                             ref chunkPOS,
                             SandSimulation.Instance.chunkSize
                         );
-                    } else if (moveLeft)
+                    }
+                    else if (moveLeft)
                     {
+                        relativeObjPos = new Vector2(-SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
+
                         targetPos = sand.AdjustPositionForChunk(
                             new Vector2Int(sand.localPosition.x - SandSimulation.Instance.horizontalSpeed, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
                             ref chunkPOS,
@@ -1490,12 +1496,16 @@ public class SandSimulation : MonoBehaviour
                     }
                     else
                     {
+                        relativeObjPos = new Vector2(0, -SandSimulation.Instance.fallSpeed);
+
                         targetPos = sand.AdjustPositionForChunk(
-                        new Vector2Int(sand.localPosition.x, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
-                        ref chunkPOS,
-                        SandSimulation.Instance.chunkSize
-                    );
+                            new Vector2Int(sand.localPosition.x, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
+                            ref chunkPOS,
+                            SandSimulation.Instance.chunkSize
+                        );
                     }
+                    
+                    
 
                     if (SandSimulation.Instance.chunks.TryGetValue(chunkPOS, out Chunk targetChunkObject))
                     {
