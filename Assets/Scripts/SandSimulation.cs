@@ -78,7 +78,7 @@ public class SandSimulation : MonoBehaviour
     void Start()
     {
         if(initOnStart) InitSimulation();
-        if (initOnStart) CheckForClearLine();
+        //if (initOnStart) CheckForClearLine();
     }
 
     private float timeSinceLastUpdate = 0f;
@@ -126,6 +126,7 @@ public class SandSimulation : MonoBehaviour
         StartCoroutine(CheckForClearLineLoop());
     }
 
+    /*
     public Color[] targetColorData => new Color[]
         {
             new Color(0.94f, 0.85f, 0.53f, 1f), // Light Beige
@@ -143,32 +144,60 @@ public class SandSimulation : MonoBehaviour
         new Color(0.1261561f, 0.391388f, 0.8627451f, 1f),
         new Color(0.1359045f, 0.1359045f, 0.9294118f, 1f)
     };
+    */
+
+    public List<Color[]> colorsToCheck = new List<Color[]>();
 
     public IEnumerator CheckForClearLineLoop()
     {
-        HashSet<(Vector2Int, Vector2Int)> foundSandElements = new HashSet<(Vector2Int, Vector2Int)>();
-        bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, out foundSandElements, targetColorData);
-        if(isConnectedSand) print("connected sand!");
+        ///HashSet<(Vector2Int, Vector2Int)> foundSandElements = new HashSet<(Vector2Int, Vector2Int)>();
+        ///bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, out foundSandElements, targetColorData);
+        ///if(isConnectedSand) print("connected sand!");
 
-        HashSet<(Vector2Int, Vector2Int)> foundBlueElements = new HashSet<(Vector2Int, Vector2Int)>();
-        bool isConnectedBlueSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, out foundBlueElements, blueColorData);
-        if (isConnectedBlueSand) print("connected bluesand!");
+        ///HashSet<(Vector2Int, Vector2Int)> foundBlueElements = new HashSet<(Vector2Int, Vector2Int)>();
+        ///bool isConnectedBlueSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, out foundBlueElements, blueColorData);
+        ///if (isConnectedBlueSand) print("connected bluesand!");
 
-        HashSet<(Vector2Int, Vector2Int)> combined = new HashSet<(Vector2Int, Vector2Int)>(foundSandElements.Union(foundBlueElements));
-        ClearLine(combined);
+        foreach (Color[] colorsRem in colorsToCheck)
+        {
+            HashSet<(Vector2Int, Vector2Int)> foundElements = new HashSet<(Vector2Int, Vector2Int)>();
+            bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, out foundElements, colorsRem);
+            if (isConnectedSand)
+            {
+                Debug.Log("found a connection!");
+                ClearLine(foundElements);
+            }
+
+            
+        }
+
+        // HashSet<(Vector2Int, Vector2Int)> combined = new HashSet<(Vector2Int, Vector2Int)>(foundSandElements.Union(foundBlueElements));
+        //ClearLine(combined);
 
         yield return new WaitForSecondsRealtime(2f);
-        StartCoroutine(CheckForClearLineLoop());
+        //gameManager.lineChecker = null;
+        gameManager.lineChecker = StartCoroutine(CheckForClearLineLoop());
     }
 
     public void ClearLine(HashSet<(Vector2Int, Vector2Int)> elementsToRemove)
     {
+        this.isSimPaused = true;
+
+        foreach (var (chunkPos, localPos) in elementsToRemove)
+        {
+            Chunk chunk = chunks[chunkPos];
+            chunk.elements[localPos.x, localPos.y].LocalColor = Color.white;
+        }
+
         foreach (var (chunkPos, localPos) in elementsToRemove)
         {
             Chunk chunk = chunks[chunkPos];
             chunk.elements[localPos.x, localPos.y] = null;
         }
+
+        this.isSimPaused = false;
     }
+
 
     // INPUT LOGIC
 
@@ -576,6 +605,11 @@ public class SandSimulation : MonoBehaviour
     {
         this.fallSpeed = this.defaultFallSpeed;
         isFastForwarding = false;
+
+        if(currentTile != null && this.fastForwardSpeed != 1 && (currentTile as WitkotrisBlock).isGranularized == false)
+        {
+            (currentTile as WitkotrisBlock).ProcessSpritePixels((currentTile as WitkotrisBlock).rotatedSprite);
+        }
     }
 
     public void EvacuateChunk(Vector2Int chunkPosition)
@@ -1246,6 +1280,7 @@ public class SandSimulation : MonoBehaviour
         public string elementType = null;
         public Color tileColor = Color.white;
         public Sprite tileShapeSprite = null;
+        public Sprite rotatedSprite = null;
         private bool initialized = false;
 
         public WitkotrisBlock(Vector2 objectPos) : base(objectPos)
@@ -1264,8 +1299,10 @@ public class SandSimulation : MonoBehaviour
             }
         }
 
-        void ProcessSpritePixels(Sprite sprite)
+        public void ProcessSpritePixels(Sprite sprite)
         {
+            rotatedSprite = sprite;
+
             // Get the sprite's texture
             Texture2D texture = sprite.texture;
 
@@ -1452,91 +1489,102 @@ public class SandSimulation : MonoBehaviour
 
         public override void Simulate()
         {
-            if (!initialized) return;
-            if (containedElements.Count <= 0) SandSimulation.Instance.simObjects.Remove(this);
+            if (!initialized || containedElements.Count <= 0) return;
+            if(isGranularized) return;
 
-            foreach (Element element in containedElements.ToList()) // Use ToList() to avoid modification issues
+            Dictionary<Element, (Vector2Int pos, Vector2Int chunk)> moves = new Dictionary<Element, (Vector2Int, Vector2Int)>();
+            Vector2 totalMovement = Vector2.zero;
+
+            foreach (Element element in containedElements)
             {
-                if (elementType == "sand" && element.containedInObject)
+                if (elementType != "sand" || !element.containedInObject) continue;
+                if(isGranularized) return;
+
+                Sand sand = element as Sand;
+                Vector2Int chunkPOS = sand.chunkPosition;
+                Vector2 relativeObjPos;
+                Vector2Int targetPos;
+
+                if (moveRight && moveLeft)
                 {
-                    Sand sand = element as Sand;
-                    Vector2Int chunkPOS = sand.chunkPosition;
-                    //Vector2Int unadjustedPos = new Vector2Int(sand.localPosition.x, sand.localPosition.y - 1);
-                    Vector2 relativeObjPos = Vector2.zero;
+                    relativeObjPos = new Vector2(0, -SandSimulation.Instance.fallSpeed);
+                    targetPos = sand.AdjustPositionForChunk(
+                        new Vector2Int(sand.localPosition.x, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
+                        ref chunkPOS,
+                        SandSimulation.Instance.chunkSize
+                    );
+                }
+                else if (moveRight)
+                {
+                    relativeObjPos = new Vector2(SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
+                    targetPos = sand.AdjustPositionForChunk(
+                        new Vector2Int(sand.localPosition.x + SandSimulation.Instance.horizontalSpeed, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
+                        ref chunkPOS,
+                        SandSimulation.Instance.chunkSize
+                    );
+                }
+                else if (moveLeft)
+                {
+                    relativeObjPos = new Vector2(-SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
+                    targetPos = sand.AdjustPositionForChunk(
+                        new Vector2Int(sand.localPosition.x - SandSimulation.Instance.horizontalSpeed, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
+                        ref chunkPOS,
+                        SandSimulation.Instance.chunkSize
+                    );
+                }
+                else
+                {
+                    relativeObjPos = new Vector2(0, -SandSimulation.Instance.fallSpeed);
+                    targetPos = sand.AdjustPositionForChunk(
+                        new Vector2Int(sand.localPosition.x, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
+                        ref chunkPOS,
+                        SandSimulation.Instance.chunkSize
+                    );
+                }
 
-                    Vector2Int targetPos = Vector2Int.zero;
+                if (SandSimulation.Instance.chunks.TryGetValue(chunkPOS, out Chunk targetChunkObject))
+                {
+                    targetChunkObject.isActive = true;
+                    targetChunkObject.isActiveNextFrame = true;
 
-                    if (moveRight && moveLeft) {
-                        relativeObjPos = new Vector2(0, -SandSimulation.Instance.fallSpeed);
+                    Vector3Int tilePosition = sand.GetTilemapPosition(targetPos, chunkPOS);
+                    bool isEmpty = !SandSimulation.Instance.collisionTilemap.HasTile(tilePosition) &&
+                                 (targetChunkObject.elements[targetPos.x, targetPos.y] == null ||
+                                  targetChunkObject.elements[targetPos.x, targetPos.y].containedInObject);
 
-                        targetPos = sand.AdjustPositionForChunk(
-                            new Vector2Int(sand.localPosition.x, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
-                            ref chunkPOS,
-                            SandSimulation.Instance.chunkSize
-                        );
-                    } else if (moveRight)
+                    if (SandSimulation.Instance.chunks.TryGetValue(sand.chunkPosition, out Chunk sandChunk))
                     {
-                        relativeObjPos = new Vector2(SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
+                        sandChunk.isActive = true;
+                        sandChunk.isActiveNextFrame = true;
 
-                        targetPos = sand.AdjustPositionForChunk(
-                            new Vector2Int(sand.localPosition.x + SandSimulation.Instance.horizontalSpeed, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
-                            ref chunkPOS,
-                            SandSimulation.Instance.chunkSize
-                        );
-                    }
-                    else if (moveLeft)
-                    {
-                        relativeObjPos = new Vector2(-SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
-
-                        targetPos = sand.AdjustPositionForChunk(
-                            new Vector2Int(sand.localPosition.x - SandSimulation.Instance.horizontalSpeed, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
-                            ref chunkPOS,
-                            SandSimulation.Instance.chunkSize
-                        );
-                    }
-                    else
-                    {
-                        relativeObjPos = new Vector2(0, -SandSimulation.Instance.fallSpeed);
-
-                        targetPos = sand.AdjustPositionForChunk(
-                            new Vector2Int(sand.localPosition.x, sand.localPosition.y - SandSimulation.Instance.fallSpeed),
-                            ref chunkPOS,
-                            SandSimulation.Instance.chunkSize
-                        );
-                    }
-                    
-                    
-
-                    if (SandSimulation.Instance.chunks.TryGetValue(chunkPOS, out Chunk targetChunkObject))
-                    {
-                        targetChunkObject.isActive = true; // Keep target chunk active
-                        targetChunkObject.isActiveNextFrame = true;
-
-                        Vector3Int tilePosition = sand.GetTilemapPosition(targetPos, chunkPOS);
-
-                        bool isEmpty = !SandSimulation.Instance.collisionTilemap.HasTile(tilePosition) &&
-                                     (targetChunkObject.elements[targetPos.x, targetPos.y] == null ||
-                                      targetChunkObject.elements[targetPos.x, targetPos.y].containedInObject);
-
-                        if (SandSimulation.Instance.chunks.TryGetValue(sand.chunkPosition, out Chunk sandChunk))
+                        if (isEmpty && sandChunk != null)
                         {
-                            sandChunk.isActive = true; // Keep source chunk active
-                            sandChunk.isActiveNextFrame = true;
-
-                            if (isEmpty && sandChunk != null)
-                            {
-                                sand.MoveToNewPositionCST(targetPos, chunkPOS, sandChunk, targetChunkObject, sand.localPosition);
-                                this.objectPosition += (relativeObjPos / SandSimulation.Instance.chunkSize) / this.containedElements.Count;
-                                //print(this.objectPosition.ToString() + " (removed: " + (relativeObjPos / SandSimulation.Instance.chunkSize) + ")");
-                            }
-                            else if (!isEmpty)
-                            {
-                                Granularize();
-                            }
+                            moves[sand] = (targetPos, chunkPOS);
+                            totalMovement += relativeObjPos;
+                        }
+                        else
+                        {
+                            Granularize();
+                            return;
                         }
                     }
                 }
             }
+
+            // Apply all moves at once
+            foreach (var move in moves)
+            {
+                Chunk currentChunk = SandSimulation.Instance.chunks[move.Key.chunkPosition];
+                Chunk targetChunk = SandSimulation.Instance.chunks[move.Value.chunk];
+                move.Key.MoveToNewPositionCST(move.Value.pos, move.Value.chunk, currentChunk, targetChunk, move.Key.localPosition);
+            }
+
+            if (moves.Count > 0)
+            {
+                objectPosition += (totalMovement / (SandSimulation.Instance.chunkSize * containedElements.Count));
+            }
+
+            if(SandSimulation.Instance.fastForwardSpeed != 1) ProcessSpritePixels(rotatedSprite);
         }
 
         public override void ComputeCollisions()
@@ -1548,6 +1596,8 @@ public class SandSimulation : MonoBehaviour
 
         public void Granularize()
         {
+            ProcessSpritePixels(rotatedSprite);
+
             foreach(Element e in containedElements)
             {
                 e.containedInObject = false;
@@ -1800,6 +1850,25 @@ public class SandSimulation : MonoBehaviour
             horizontalVelocity = 0f;
             hasContactBelow = false;
             hasContactAbove = false;
+        }
+
+        // In your Element class:
+        public virtual bool MoveToNewPositionCST(Vector2Int newPos, Vector2Int newChunkPos, Chunk currentChunk, Chunk targetChunk, Vector2Int currentPos)
+        {
+            if (currentChunk == targetChunk)
+            {
+                currentChunk.elements[currentPos.x, currentPos.y] = null;
+                currentChunk.elements[newPos.x, newPos.y] = this;
+                localPosition = newPos;
+                return true;
+            }
+
+            currentChunk.elements[currentPos.x, currentPos.y] = null;
+            targetChunk.elements[newPos.x, newPos.y] = this;
+            localPosition = newPos;
+            chunkPosition = newChunkPos;
+            targetChunk.isActive = true;
+            return true;
         }
 
         public Vector2Int GetGlobalPosition()

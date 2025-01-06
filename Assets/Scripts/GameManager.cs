@@ -45,6 +45,8 @@ public class GameManager : MonoBehaviour
                 dataColors.Add(GetTileColorBlending(tileSprites[0], color).ToArray());
             }
         }
+
+        SandSimulation.Instance.colorsToCheck = dataColors;
     }
 
     public void StartGame()
@@ -98,9 +100,16 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    [HideInInspector] public Coroutine lineChecker = null;
+
     public void TriggerNextTile()
     {
         StartCoroutine(DelayNextTile());
+
+        if(lineChecker == null)
+        {
+            lineChecker = SandSimulation.Instance.StartCoroutine(SandSimulation.Instance.CheckForClearLineLoop());
+        }
     }
 
     public IEnumerator DelayNextTile()
