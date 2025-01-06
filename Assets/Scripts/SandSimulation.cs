@@ -1494,6 +1494,9 @@ public class SandSimulation : MonoBehaviour
             if (!initialized || containedElements.Count <= 0) return;
             if(isGranularized) return;
 
+            //bool outOfBoundsRight = CheckForOutOfBounds(new Vector2Int(1, 0));
+            //bool outOfBoundsLeft = CheckForOutOfBounds(new Vector2Int(-1, 0));
+
             Dictionary<Element, (Vector2Int pos, Vector2Int chunk)> moves = new Dictionary<Element, (Vector2Int, Vector2Int)>();
             Vector2 totalMovement = Vector2.zero;
 
@@ -1587,6 +1590,28 @@ public class SandSimulation : MonoBehaviour
             }
 
             if(SandSimulation.Instance.fastForwardSpeed != 1) ProcessSpritePixels(rotatedSprite);
+        }
+
+        public bool CheckForOutOfBounds(Vector2Int tPos) //true = out of bounds
+        {
+            Vector2Int targetPos = tPos;
+
+            foreach(Element e in containedElements)
+            {
+                Vector2Int newChunkPos = e.chunkPosition;
+                targetPos = (e as Sand).AdjustPositionForChunk(
+                        new Vector2Int((e as Sand).localPosition.x + targetPos.x, (e as Sand).localPosition.y + targetPos.y),
+                        ref newChunkPos,
+                        SandSimulation.Instance.chunkSize
+                    );
+
+                if (!SandSimulation.Instance.chunks.ContainsKey(newChunkPos))
+                {
+                    return true; // out of bounds
+                }
+            }
+
+            return false; // all checks passed, not out of bounds
         }
 
         public override void ComputeCollisions()
