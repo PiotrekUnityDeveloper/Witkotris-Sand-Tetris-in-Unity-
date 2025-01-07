@@ -389,6 +389,7 @@ MonoBehaviour:
   renderChunkBorders: 0
   showActiveChunks: 1
   renderElements: 0
+  typesToCheck: []
 --- !u!4 &322835529
 Transform:
   m_ObjectHideFlags: 0
@@ -677,7 +678,7 @@ MonoBehaviour:
   - colorName: yellow
     color: {r: 0.97619045, g: 1, b: 0, a: 1}
   - colorName: green
-    color: {r: 0, g: 0.8962264, b: 0.21529414, a: 1}
+    color: {r: 0, g: 0.745283, b: 0.17899817, a: 1}
   tileShapeDefinitions:
   - tileName: Z
     tileSprite: {fileID: 21300000, guid: 74173d49af0cd4741917ef64e45c09a1, type: 3}
@@ -693,6 +694,10 @@ MonoBehaviour:
     tileSprite: {fileID: 21300000, guid: 7ce367c76bc35bf4aa178508212cdf37, type: 3}
   - tileName: V
     tileSprite: {fileID: 21300000, guid: 3b70ba5e0b53a5240b01ae63d446d906, type: 3}
+  elementTypes:
+  - sand
+  - water
+  - sawdust
 --- !u!114 &607867750
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -709,6 +714,7 @@ MonoBehaviour:
   simulation: {fileID: 322835528}
   tileColors: []
   tileSprites: []
+  elementTypes: []
   tileSpawnpoint: {fileID: 157127251}
 --- !u!4 &607867751
 Transform:

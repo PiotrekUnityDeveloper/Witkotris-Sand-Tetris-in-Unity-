@@ -11,6 +11,7 @@ public class GameManager : MonoBehaviour
     public SandSimulation simulation;
     public List<Color> tileColors = new List<Color>();
     public List<Sprite> tileSprites = new List<Sprite>();
+    public List<string> elementTypes = new List<string>();
 
     // used for clearline checks
     public List<Color[]> dataColors = new List<Color[]>();
@@ -37,6 +38,12 @@ public class GameManager : MonoBehaviour
             this.tileSprites.Add(shapedef.tileSprite);
         }
 
+        foreach(string etype in gameDataIndex.elementTypes)
+        {
+            this.elementTypes.Add(etype);
+        }
+
+
         //assuming each tilesprite has the same pallete of colors (if not, use a double loop)
         if(tileSprites.Count > 0)
         {
@@ -47,13 +54,14 @@ public class GameManager : MonoBehaviour
         }
 
         SandSimulation.Instance.colorsToCheck = dataColors;
+        SandSimulation.Instance.typesToCheck = elementTypes;
     }
 
     public void StartGame()
     {
         if(tileSpawnpoint != null)
         {
-            simulation.CreateSimObject(tileSpawnpoint.position, GetRandomTileSprite(), GetRandomTileColor());
+            simulation.CreateSimObject(tileSpawnpoint.position, GetRandomTileSprite(), GetRandomTileColor(), GetRandomElementType());
         }else { Debug.Log("tileSpawnpoint is null, please assign it so tiles have a place to spawn..."); }
     }
 
@@ -145,17 +153,22 @@ public class GameManager : MonoBehaviour
     public IEnumerator DelayNextTile()
     {
         yield return new WaitForSeconds(0.4f);
-        simulation.CreateSimObject(tileSpawnpoint.position, GetRandomTileSprite(), GetRandomTileColor());
+        simulation.CreateSimObject(tileSpawnpoint.position, GetRandomTileSprite(), GetRandomTileColor(), GetRandomElementType());
     }
 
     public Color GetRandomTileColor()
     {
-        return tileColors[Random.Range(0, tileColors.Count - 1)];
+        return tileColors[Random.Range(0, tileColors.Count)];
     }
 
     public Sprite GetRandomTileSprite()
     {
-        return tileSprites[Random.Range(0, tileSprites.Count - 1)];
+        return tileSprites[Random.Range(0, tileSprites.Count)];
+    }
+
+    public string GetRandomElementType()
+    {
+        return elementTypes[Random.Range(0, elementTypes.Count)];
     }
 
     public List<Color> GetTileColorBlending(Sprite tileSprite, Color tileColor)

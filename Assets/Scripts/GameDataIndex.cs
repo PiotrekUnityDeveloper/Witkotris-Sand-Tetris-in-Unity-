@@ -6,6 +6,7 @@ public class GameDataIndex : MonoBehaviour
 {
     public List<ColorDef> colorDefinitions = new List<ColorDef>();
     public List<TileShapeDef> tileShapeDefinitions = new List<TileShapeDef>();
+    public List<string> elementTypes = new List<string>();
 }
 
 [System.Serializable]
