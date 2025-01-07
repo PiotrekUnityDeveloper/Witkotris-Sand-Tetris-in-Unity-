@@ -1494,8 +1494,8 @@ public class SandSimulation : MonoBehaviour
             if (!initialized || containedElements.Count <= 0) return;
             if(isGranularized) return;
 
-            //bool outOfBoundsRight = CheckForOutOfBounds(new Vector2Int(1, 0));
-            //bool outOfBoundsLeft = CheckForOutOfBounds(new Vector2Int(-1, 0));
+            bool outOfBoundsRight = CheckForOutOfBounds(new Vector2Int(SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed));
+            bool outOfBoundsLeft = CheckForOutOfBounds(new Vector2Int(-SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed));
 
             Dictionary<Element, (Vector2Int pos, Vector2Int chunk)> moves = new Dictionary<Element, (Vector2Int, Vector2Int)>();
             Vector2 totalMovement = Vector2.zero;
@@ -1519,7 +1519,7 @@ public class SandSimulation : MonoBehaviour
                         SandSimulation.Instance.chunkSize
                     );
                 }
-                else if (moveRight)
+                else if (moveRight && !outOfBoundsRight)
                 {
                     relativeObjPos = new Vector2(SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
                     targetPos = sand.AdjustPositionForChunk(
@@ -1528,7 +1528,7 @@ public class SandSimulation : MonoBehaviour
                         SandSimulation.Instance.chunkSize
                     );
                 }
-                else if (moveLeft)
+                else if (moveLeft && !outOfBoundsLeft)
                 {
                     relativeObjPos = new Vector2(-SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
                     targetPos = sand.AdjustPositionForChunk(
@@ -1595,10 +1595,11 @@ public class SandSimulation : MonoBehaviour
         public bool CheckForOutOfBounds(Vector2Int tPos) //true = out of bounds
         {
             Vector2Int targetPos = tPos;
+            Vector2Int newChunkPos;
 
-            foreach(Element e in containedElements)
+            foreach (Element e in containedElements)
             {
-                Vector2Int newChunkPos = e.chunkPosition;
+                newChunkPos = e.chunkPosition;
                 targetPos = (e as Sand).AdjustPositionForChunk(
                         new Vector2Int((e as Sand).localPosition.x + targetPos.x, (e as Sand).localPosition.y + targetPos.y),
                         ref newChunkPos,
