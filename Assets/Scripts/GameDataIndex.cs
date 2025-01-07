@@ -4,6 +4,10 @@ using UnityEngine;
 
 public class GameDataIndex : MonoBehaviour
 {
+    //game settings
+    public bool checkColorsOnly = true;
+
+    //selected types and stuff
     public List<ColorDef> colorDefinitions = new List<ColorDef>();
     public List<TileShapeDef> tileShapeDefinitions = new List<TileShapeDef>();
     public List<string> elementTypes = new List<string>();

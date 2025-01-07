@@ -53,6 +53,7 @@ public class GameManager : MonoBehaviour
             }
         }
 
+        SandSimulation.Instance.checkColorsOnly = gameDataIndex.checkColorsOnly;
         SandSimulation.Instance.colorsToCheck = dataColors;
         SandSimulation.Instance.typesToCheck = elementTypes;
     }

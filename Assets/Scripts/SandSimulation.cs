@@ -149,6 +149,7 @@ public class SandSimulation : MonoBehaviour
 
     public List<Color[]> colorsToCheck = new List<Color[]>();
     public List<string> typesToCheck = new List<string>();
+    public bool checkColorsOnly = true;
 
     public IEnumerator CheckForClearLineLoop()
     {
@@ -159,46 +160,62 @@ public class SandSimulation : MonoBehaviour
         ///HashSet<(Vector2Int, Vector2Int)> foundBlueElements = new HashSet<(Vector2Int, Vector2Int)>();
         ///bool isConnectedBlueSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, out foundBlueElements, blueColorData);
         ///if (isConnectedBlueSand) print("connected bluesand!");
-        
-        foreach(string etype in typesToCheck)
+
+        if (!checkColorsOnly)
         {
-            if(etype == "sand")
+            foreach (string etype in typesToCheck)
             {
-                foreach (Color[] colorsRem in colorsToCheck)
+                if (etype == "sand")
                 {
-                    HashSet<(Vector2Int, Vector2Int)> foundElements = new HashSet<(Vector2Int, Vector2Int)>();
-                    bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, out foundElements, colorsRem);
-                    if (isConnectedSand)
+                    foreach (Color[] colorsRem in colorsToCheck)
                     {
-                        Debug.Log("found a connection!");
-                        ClearLine(foundElements);
+                        HashSet<(Vector2Int, Vector2Int)> foundElements = new HashSet<(Vector2Int, Vector2Int)>();
+                        bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Sand>(chunks, out foundElements, colorsRem);
+                        if (isConnectedSand)
+                        {
+                            Debug.Log("found a connection!");
+                            ClearLine(foundElements);
+                        }
+                    }
+                }
+                else if (etype == "water")
+                {
+                    foreach (Color[] colorsRem in colorsToCheck)
+                    {
+                        HashSet<(Vector2Int, Vector2Int)> foundElements = new HashSet<(Vector2Int, Vector2Int)>();
+                        bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Water>(chunks, out foundElements, colorsRem);
+                        if (isConnectedSand)
+                        {
+                            Debug.Log("found a connection!");
+                            ClearLine(foundElements);
+                        }
+                    }
+                }
+                else if (etype == "sawdust")
+                {
+                    foreach (Color[] colorsRem in colorsToCheck)
+                    {
+                        HashSet<(Vector2Int, Vector2Int)> foundElements = new HashSet<(Vector2Int, Vector2Int)>();
+                        bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Water>(chunks, out foundElements, colorsRem);
+                        if (isConnectedSand)
+                        {
+                            Debug.Log("found a connection!");
+                            ClearLine(foundElements);
+                        }
                     }
                 }
             }
-            else if (etype == "water")
+        }
+        else
+        {
+            foreach (Color[] colorsRem in colorsToCheck)
             {
-                foreach (Color[] colorsRem in colorsToCheck)
+                HashSet<(Vector2Int, Vector2Int)> foundElements = new HashSet<(Vector2Int, Vector2Int)>();
+                bool isConnectedSand = ColorEdgeConnectionChecker.CheckColorConnectsBorders(chunks, out foundElements, colorsRem);
+                if (isConnectedSand)
                 {
-                    HashSet<(Vector2Int, Vector2Int)> foundElements = new HashSet<(Vector2Int, Vector2Int)>();
-                    bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Water>(chunks, out foundElements, colorsRem);
-                    if (isConnectedSand)
-                    {
-                        Debug.Log("found a connection!");
-                        ClearLine(foundElements);
-                    }
-                }
-            }
-            else if (etype == "sawdust")
-            {
-                foreach (Color[] colorsRem in colorsToCheck)
-                {
-                    HashSet<(Vector2Int, Vector2Int)> foundElements = new HashSet<(Vector2Int, Vector2Int)>();
-                    bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Water>(chunks, out foundElements, colorsRem);
-                    if (isConnectedSand)
-                    {
-                        Debug.Log("found a connection!");
-                        ClearLine(foundElements);
-                    }
+                    Debug.Log("found a connection!");
+                    ClearLine(foundElements);
                 }
             }
         }
@@ -3954,5 +3971,285 @@ public class ArrayUtility
             array[i] = temp;
         }
         return array;  // Return the shuffled array
+    }
+}
+
+public static class ColorEdgeConnectionChecker
+{
+    public static bool CheckColorConnectsBorders(
+        Dictionary<Vector2Int, Chunk> chunks,
+        out HashSet<(Vector2Int chunkPos, Vector2Int localPos)> connectedElements,
+        Color[] requiredColors)
+    {
+        connectedElements = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
+
+        var relevantChunks = new HashSet<Vector2Int>();
+        var minX = int.MaxValue;
+        var maxX = int.MinValue;
+
+        foreach (var kvp in chunks)
+        {
+            if (HasColoredElement(kvp.Value, requiredColors))
+            {
+                relevantChunks.Add(kvp.Key);
+                minX = Math.Min(minX, kvp.Key.x);
+                maxX = Math.Max(maxX, kvp.Key.x);
+            }
+        }
+
+        if (relevantChunks.Count == 0) return false;
+
+        // Find starting points that match ANY of the required colors
+        var startingPoints = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
+        foreach (var chunkPos in relevantChunks.Where(c => c.x == minX))
+        {
+            var chunk = chunks[chunkPos];
+            for (int y = 0; y < chunk.chunkSize; y++)
+            {
+                var element = chunk.elements[0, y];
+                if (element != null && ColorMatches(element, requiredColors))
+                {
+                    startingPoints.Add((chunkPos, new Vector2Int(0, y)));
+                }
+            }
+        }
+
+        if (startingPoints.Count == 0) return false;
+
+        var allConnectedElements = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
+
+        foreach (var start in startingPoints)
+        {
+            var visited = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
+            if (PathExistsToRightEdge(start, chunks, maxX, visited, requiredColors, out var initialPath))
+            {
+                var connectedForThisPath = FloodFillFromPath(chunks, initialPath, requiredColors);
+                allConnectedElements.UnionWith(connectedForThisPath);
+            }
+        }
+
+        if (allConnectedElements.Count > 0)
+        {
+            connectedElements = allConnectedElements;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasColoredElement(Chunk chunk, Color[] requiredColors)
+    {
+        for (int x = 0; x < chunk.chunkSize; x++)
+        {
+            for (int y = 0; y < chunk.chunkSize; y++)
+            {
+                var element = chunk.elements[x, y];
+                if (element != null && ColorMatches(element, requiredColors))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static HashSet<(Vector2Int chunkPos, Vector2Int localPos)> FloodFillFromPath(
+        Dictionary<Vector2Int, Chunk> chunks,
+        HashSet<(Vector2Int chunkPos, Vector2Int localPos)> initialPath,
+        Color[] requiredColors)
+    {
+        var allConnected = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
+        var queue = new Queue<(Vector2Int chunkPos, Vector2Int localPos)>();
+
+        foreach (var point in initialPath)
+        {
+            if (!allConnected.Contains(point))
+            {
+                queue.Enqueue(point);
+                allConnected.Add(point);
+            }
+        }
+
+        while (queue.Count > 0)
+        {
+            var (currentChunkPos, currentLocalPos) = queue.Dequeue();
+            var currentChunk = chunks[currentChunkPos];
+
+            Vector2Int[] directions = new Vector2Int[]
+            {
+                new Vector2Int(1, 0),   // right
+                new Vector2Int(-1, 0),  // left
+                new Vector2Int(0, 1),   // up
+                new Vector2Int(0, -1),  // down
+                new Vector2Int(1, 1),   // up-right
+                new Vector2Int(1, -1),  // down-right
+                new Vector2Int(-1, 1),  // up-left
+                new Vector2Int(-1, -1), // down-left
+            };
+
+            foreach (var dir in directions)
+            {
+                var nextLocalPos = currentLocalPos + dir;
+                var nextChunkPos = currentChunkPos;
+
+                // Handle chunk boundaries
+                if (nextLocalPos.x >= currentChunk.chunkSize)
+                {
+                    nextLocalPos.x = 0;
+                    nextChunkPos.x += 1;
+                }
+                else if (nextLocalPos.x < 0)
+                {
+                    nextLocalPos.x = currentChunk.chunkSize - 1;
+                    nextChunkPos.x -= 1;
+                }
+
+                if (nextLocalPos.y >= currentChunk.chunkSize)
+                {
+                    nextLocalPos.y = 0;
+                    nextChunkPos.y += 1;
+                }
+                else if (nextLocalPos.y < 0)
+                {
+                    nextLocalPos.y = currentChunk.chunkSize - 1;
+                    nextChunkPos.y -= 1;
+                }
+
+                var nextPos = (nextChunkPos, nextLocalPos);
+
+                if (allConnected.Contains(nextPos) || !chunks.ContainsKey(nextChunkPos))
+                    continue;
+
+                var nextChunk = chunks[nextChunkPos];
+                var nextElement = nextChunk.elements[nextLocalPos.x, nextLocalPos.y];
+
+                if (nextElement != null && ColorMatches(nextElement, requiredColors))
+                {
+                    queue.Enqueue(nextPos);
+                    allConnected.Add(nextPos);
+                }
+            }
+        }
+
+        return allConnected;
+    }
+
+    private static bool ColorMatches(Element element, Color[] requiredColors)
+    {
+        if (!element.useCustomColorData)
+        {
+            Debug.Log("element doesn't support color");
+            return true; // Element doesn't use color data
+        }
+
+        foreach (var color in requiredColors)
+        {
+            if (element.colorData.Any(c => ColorsAreEqualIgnoringAlpha(c, color)))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool ColorsAreEqualIgnoringAlpha(Color color1, Color color2)
+    {
+        return Mathf.Approximately(color1.r, color2.r) &&
+               Mathf.Approximately(color1.g, color2.g) &&
+               Mathf.Approximately(color1.b, color2.b);
+    }
+
+    private static bool PathExistsToRightEdge(
+        (Vector2Int chunkPos, Vector2Int localPos) current,
+        Dictionary<Vector2Int, Chunk> chunks,
+        int maxX,
+        HashSet<(Vector2Int chunkPos, Vector2Int localPos)> visited,
+        Color[] requiredColor,
+        out HashSet<(Vector2Int chunkPos, Vector2Int localPos)> initialPath)
+    {
+        initialPath = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
+        var queue = new Queue<(Vector2Int chunkPos, Vector2Int localPos)>();
+        var pathParent = new Dictionary<(Vector2Int chunkPos, Vector2Int localPos), (Vector2Int chunkPos, Vector2Int localPos)>();
+
+        queue.Enqueue(current);
+        visited.Add(current);
+
+        while (queue.Count > 0)
+        {
+            var (currentChunkPos, currentLocalPos) = queue.Dequeue();
+            var currentChunk = chunks[currentChunkPos];
+
+            // Check if we reached the right edge
+            if (currentChunkPos.x == maxX && currentLocalPos.x == currentChunk.chunkSize - 1)
+            {
+                // Reconstruct the initial path
+                var pathPoint = (currentChunkPos, currentLocalPos);
+                while (pathParent.ContainsKey(pathPoint))
+                {
+                    initialPath.Add(pathPoint);
+                    pathPoint = pathParent[pathPoint];
+                }
+                initialPath.Add(current); // Add the starting point
+                return true;
+            }
+
+            Vector2Int[] directions = new Vector2Int[]
+            {
+                new Vector2Int(1, 0),   // right
+                new Vector2Int(-1, 0),  // left
+                new Vector2Int(0, 1),   // up
+                new Vector2Int(0, -1),  // down
+                new Vector2Int(1, 1),   // up-right
+                new Vector2Int(1, -1),  // down-right
+                new Vector2Int(-1, 1),  // up-left
+                new Vector2Int(-1, -1), // down-left
+            };
+
+            foreach (var dir in directions)
+            {
+                var nextLocalPos = currentLocalPos + dir;
+                var nextChunkPos = currentChunkPos;
+
+                // Handle chunk boundaries
+                if (nextLocalPos.x >= currentChunk.chunkSize)
+                {
+                    nextLocalPos.x = 0;
+                    nextChunkPos.x += 1;
+                }
+                else if (nextLocalPos.x < 0)
+                {
+                    nextLocalPos.x = currentChunk.chunkSize - 1;
+                    nextChunkPos.x -= 1;
+                }
+
+                if (nextLocalPos.y >= currentChunk.chunkSize)
+                {
+                    nextLocalPos.y = 0;
+                    nextChunkPos.y += 1;
+                }
+                else if (nextLocalPos.y < 0)
+                {
+                    nextLocalPos.y = currentChunk.chunkSize - 1;
+                    nextChunkPos.y -= 1;
+                }
+
+                var nextPos = (nextChunkPos, nextLocalPos);
+
+                if (visited.Contains(nextPos) || !chunks.ContainsKey(nextChunkPos))
+                    continue;
+
+                var nextChunk = chunks[nextChunkPos];
+                var nextElement = nextChunk.elements[nextLocalPos.x, nextLocalPos.y];
+
+                if (nextElement != null && ColorMatches(nextElement, requiredColor))
+                {
+                    queue.Enqueue(nextPos);
+                    visited.Add(nextPos);
+                    pathParent[nextPos] = (currentChunkPos, currentLocalPos);
+                }
+            }
+        }
+
+        return false;
     }
 }
