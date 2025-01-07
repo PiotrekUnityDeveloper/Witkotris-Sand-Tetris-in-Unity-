@@ -2412,7 +2412,7 @@ public class SandSimulation : MonoBehaviour
         public virtual float density => 0.1f; // Default density for powder particles
         public virtual float sinkSpeed => 0.02f; // How fast the particle sinks in liquid
         public virtual float diagonalSinkSpeed => 0.15f; // How likely to sink diagonally
-        public virtual float gravityReduce => 0.25f; // How much to reduce gravity
+        public virtual float gravityReduce => 0.15f; // How much to reduce gravity
 
         //COLOR DATA
         public override bool useCustomColorData => true;
@@ -2435,7 +2435,7 @@ public class SandSimulation : MonoBehaviour
 
         // overriden from the base Particle class
         public override float maxVelocity => 5f;  // Maximum fall speed
-        public override float velocityAbsorption => 0.5f; // How much velocity is retained on impact (0-1)
+        public override float velocityAbsorption => 0.8f; // How much velocity is retained on impact (0-1)
         public override float maxHorizontalVelocity => 3f; // Maximum horizontal speed
         public override float horizontalDrag => 0.2f; // Base drag in air
         public override float friction => 0.4f; // Additional slowdown when touching surfaces
@@ -2570,7 +2570,7 @@ public class SandSimulation : MonoBehaviour
             for (int step = 0; step < steps; step++)
             {
                 Vector2Int[] potentialMoves = GetPotentialMoves(current, isResting, horizontalVelocity);
-                //potentialMoves = ArrayUtility.Shuffle(potentialMoves);
+                potentialMoves = ArrayUtility.Shuffle(potentialMoves);
                 bool moved = false;
                 bool hitObstacle = false;
 
@@ -2626,69 +2626,77 @@ public class SandSimulation : MonoBehaviour
             UpdateLastPosition(nextMoveChunk, currentChunk);
         }
 
+        public bool IsGrounded()
+        {
+            Vector2Int desiredChunk = this.chunkPosition;
+            Vector2Int desiredLocal = this.localPosition;
+            desiredLocal = this.AdjustPositionForChunk(desiredLocal, ref desiredChunk, SandSimulation.Instance.chunkSize);
+
+            if (SandSimulation.Instance.chunks[desiredChunk].elements[desiredLocal.x, desiredLocal.y] == null)
+            {
+                return false; // not grounded
+            }
+            else
+            {
+                return true; // grounded, something is below
+            }
+        }
+
         private Vector2Int[] GetPotentialMoves(Vector2Int current, bool isResting, float horizontalVelocity)
         {
             if (isResting)
             {
+                // When resting, only check straight down
                 return new Vector2Int[] { new Vector2Int(current.x, current.y - 1) };
             }
 
+            // Add random drift when in air
+            float randomDrift = Random.Range(-0.2f, 0.2f);
+            horizontalVelocity += randomDrift;
+
             int horizontalDir = horizontalVelocity > 0 ? 1 : -1;
-            if (Mathf.Abs(horizontalVelocity) < 0.1f) horizontalDir = 0;
+            if (Mathf.Abs(horizontalVelocity) < 0.05f) horizontalDir = 0;
 
-            if (horizontalDir == 0)
+            // Prioritize diagonal movement for more natural dust behavior
+            if(this.fallVelocity > 0.1f)
             {
-                return Random.Range(0, 2) == 0 ?
-                    new Vector2Int[]
-                    {
-                        new Vector2Int(current.x, current.y - 1),
-                        new Vector2Int(current.x - 1, current.y - 1),
-                        new Vector2Int(current.x + 1, current.y - 1),
-                        new Vector2Int(current.x + 1, current.y),
-                        new Vector2Int(current.x - 1, current.y),
-                    } :
-                    new Vector2Int[]
-                    {
-                        new Vector2Int(current.x, current.y - 1),
-                        new Vector2Int(current.x + 1, current.y - 1),
-                        new Vector2Int(current.x - 1, current.y - 1),
-                        new Vector2Int(current.x + 1, current.y),
-                        new Vector2Int(current.x - 1, current.y),
-                    };
-            }
-
-            return Random.Range(0, 2) == 0 ?
-                new Vector2Int[]
-                {
-                    new Vector2Int(current.x, current.y - 1),
-                    new Vector2Int(current.x + horizontalDir, current.y - 1),
-                    new Vector2Int(current.x + horizontalDir, current.y),
-                    new Vector2Int(current.x - horizontalDir, current.y - 1),
-                    new Vector2Int(current.x + horizontalDir, current.y),
-                    new Vector2Int(current.x - horizontalDir, current.y),
-                } :
-                new Vector2Int[]
+                return new Vector2Int[]
                 {
                     new Vector2Int(current.x + horizontalDir, current.y - 1),
                     new Vector2Int(current.x, current.y - 1),
                     new Vector2Int(current.x + horizontalDir, current.y),
                     new Vector2Int(current.x - horizontalDir, current.y - 1),
-                    new Vector2Int(current.x + horizontalDir, current.y),
                     new Vector2Int(current.x - horizontalDir, current.y),
                 };
+            }
+            else
+            {
+                return new Vector2Int[]
+                {
+                    new Vector2Int(current.x, current.y - 1),
+                };
+            }
         }
 
         private void HandleCollision(bool hitObstacle)
         {
-            if (hitObstacle && fallVelocity > 0.5f)
+            if (hitObstacle)
             {
-                float impactForce = fallVelocity * velocityAbsorption;
-                horizontalVelocity = Random.Range(-1f, 1f) * impactForce;
-                horizontalVelocity = Mathf.Clamp(horizontalVelocity, -maxHorizontalVelocity, maxHorizontalVelocity);
+                if (fallVelocity > 0.3f) // Reduced threshold for bounce
+                {
+                    float impactForce = fallVelocity * velocityAbsorption;
+                    horizontalVelocity = Random.Range(-0.5f, 0.5f) * impactForce; // Reduced scatter
+                    horizontalVelocity = Mathf.Clamp(horizontalVelocity, -maxHorizontalVelocity, maxHorizontalVelocity);
+                }
+                else
+                {
+                    // More likely to come to rest when moving slowly
+                    horizontalVelocity *= 0.5f;
+                }
             }
 
             fallVelocity = 0f;
-            isResting = (Mathf.Abs(horizontalVelocity) < 0.1f);
+            isResting = (Mathf.Abs(horizontalVelocity) < 0.05f); // Easier to come to rest
         }
 
         private void UpdateLastPosition(Chunk nextMoveChunk, Chunk currentChunk)
