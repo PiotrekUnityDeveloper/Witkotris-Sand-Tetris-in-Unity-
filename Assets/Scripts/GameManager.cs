@@ -69,35 +69,65 @@ public class GameManager : MonoBehaviour
         // ROTATE TILE
         if (Input.GetKeyDown(KeyCode.UpArrow))
         {
-            simulation.RotateSimObject();
+            Rotate();
         }
 
         // HORIZONTAL MOVEMENT
         if (Input.GetKeyDown(KeyCode.RightArrow))
         {
-            simulation.MoveTileRight();
+            MoveRight();
         }
 
         if (Input.GetKeyDown(KeyCode.LeftArrow))
         {
-            simulation.MoveTileLeft();
+            MoveLeft();
         }
 
         if(Input.GetKeyUp(KeyCode.RightArrow) || Input.GetKeyUp(KeyCode.LeftArrow))
         {
-            simulation.StopTileMovement();
+            StopMove();
         }
 
         // FAST FORWARD
         if (Input.GetKeyDown(KeyCode.DownArrow))
         {
-            simulation.FastForwardFall();
+            FastForward();
         }
 
         if (Input.GetKeyUp(KeyCode.DownArrow))
         {
-            simulation.StopFastFall();
+            StopFastForward();
         }
+    }
+
+    public void MoveLeft()
+    {
+        simulation.MoveTileLeft();
+    }
+
+    public void MoveRight()
+    {
+        simulation.MoveTileRight();
+    }
+
+    public void StopMove()
+    {
+        simulation.StopTileMovement();
+    }
+
+    public void Rotate()
+    {
+        simulation.RotateSimObject();
+    }
+
+    public void FastForward()
+    {
+        simulation.FastForwardFall();
+    }
+
+    public void StopFastForward()
+    {
+        simulation.StopFastFall();
     }
 
     [HideInInspector] public Coroutine lineChecker = null;
