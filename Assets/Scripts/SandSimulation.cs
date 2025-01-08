@@ -1,14 +1,7 @@
-using JetBrains.Annotations;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel.Design;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Xml;
-using Unity.Mathematics;
-using Unity.VisualScripting;
-using Unity.VisualScripting.FullSerializer;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using static SandSimulation;
@@ -263,6 +256,80 @@ public class SandSimulation : MonoBehaviour
 
 
     // INPUT LOGIC
+
+    public void CreateTempElement(Vector2 pos)
+    {
+        string elementName = "tempelement";
+
+        Vector2 worldPos = pos;
+
+        int checkRadius = Mathf.CeilToInt(drawingBrushSize);
+        for (int xOffset = -checkRadius; xOffset <= checkRadius; xOffset++)
+        {
+            for (int yOffset = -checkRadius; yOffset <= checkRadius; yOffset++)
+            {
+                Vector2 checkPos = new Vector2(
+                    worldPos.x + xOffset / (float)chunkSize,
+                    worldPos.y + yOffset / (float)chunkSize
+                );
+
+                float distance = Vector2.Distance(worldPos, checkPos);
+                if (distance > drawingBrushSize / (float)chunkSize) continue;
+
+                Vector2Int cellPos = new Vector2Int(
+                    Mathf.FloorToInt(checkPos.x),
+                    Mathf.FloorToInt(checkPos.y)
+                );
+
+                Vector2Int chunkPos = new Vector2Int(
+                    Mathf.FloorToInt(cellPos.x),
+                    Mathf.FloorToInt(cellPos.y)
+                );
+
+                if (!chunks.ContainsKey(chunkPos))
+                {
+                    continue;
+                }
+
+                Vector2Int localPos = new Vector2Int(
+                    Mathf.RoundToInt((checkPos.x - chunkPos.x) * chunkSize),
+                    Mathf.RoundToInt((checkPos.y - chunkPos.y) * chunkSize)
+                );
+
+                localPos.x = Mathf.Clamp(localPos.x, 0, chunkSize - 1);
+                localPos.y = Mathf.Clamp(localPos.y, 0, chunkSize - 1);
+
+                Vector3Int tilePosition = new Vector3Int(
+                    localPos.x / chunkSize + chunkPos.x,
+                    localPos.y / chunkSize + chunkPos.y,
+                    0
+                );
+
+                if (collisionTilemap.HasTile(tilePosition))
+                {
+                    continue;
+                }
+
+                if (chunks[chunkPos].elements[localPos.x, localPos.y] == null)
+                {
+                    Element tempElement = null;
+                    chunks[chunkPos].AddElement(localPos, out tempElement, elementName);
+                    if(tempElement != null) StartCoroutine(KillTempElement(tempElement));
+                    if (interactionUpdatesEnvironment) chunks[chunkPos].WakeUpParticleNeighbors(localPos, chunkPos);
+                }
+            }
+        }
+    }
+
+    public IEnumerator KillTempElement(Element e)
+    {
+        if(e.GetType() == typeof(TemporalPowder))
+        {
+            yield return new WaitForSecondsRealtime(25f);
+            (e as TemporalPowder).Die();
+            //print("dead!");
+        }
+    }
 
     private void CreateElementsAtMousePos()
     {
@@ -906,8 +973,51 @@ public class SandSimulation : MonoBehaviour
                     case "flour":
                         newParticle = new SawDust(localPos, chunkPosition);
                         break;
+                    case "tempelement":
+                        newParticle = new SawDust(localPos, chunkPosition);
+                        break;
                     default:
                         newParticle = new Sand(localPos, chunkPosition);
+                        break;
+                }
+                elements[localPos.x, localPos.y] = newParticle;
+                this.isActive = true;
+                this.isActiveNextFrame = true;
+            }
+        }
+
+        public void AddElement(Vector2Int localPos, out Element e, string type = "sand")
+        {
+            e = null;
+
+            if (localPos.x >= 0 && localPos.x < chunkSize && localPos.y >= 0 && localPos.y < chunkSize)
+            {
+                Element newParticle;
+                switch (type.ToLower())
+                {
+                    case "water":
+                        newParticle = new Water(localPos, chunkPosition);
+                        e = newParticle;
+                        break;
+                    case "sand":
+                        newParticle = new Sand(localPos, chunkPosition);
+                        e = newParticle;
+                        break;
+                    case "sawdust":
+                        newParticle = new SawDust(localPos, chunkPosition);
+                        e = newParticle;
+                        break;
+                    case "flour":
+                        newParticle = new SawDust(localPos, chunkPosition);
+                        e = newParticle;
+                        break;
+                    case "tempelement":
+                        newParticle = new TemporalPowder(localPos, chunkPosition);
+                        e = newParticle;
+                        break;
+                    default:
+                        newParticle = new Sand(localPos, chunkPosition);
+                        e = newParticle;
                         break;
                 }
                 elements[localPos.x, localPos.y] = newParticle;
@@ -4144,6 +4254,49 @@ public class SandSimulation : MonoBehaviour
         public void SetCustomColorData(Color[] colors)
         {
             _customColorData = colors;
+        }
+    }
+
+    public class TemporalPowder : PowderElement
+    {
+        private Color[] _customColorData;
+        //private float lifetime = 3f;
+
+        public override Color[] colorData => _customColorData ?? new Color[]
+        {
+            new Color(0.078f, 0.078f, 0.078f), // #141414
+            new Color(0.164f, 0.164f, 0.164f), // #2A2A2A
+            new Color(0.059f, 0.059f, 0.059f), // #0F0F0F
+            new Color(0.196f, 0.196f, 0.196f), // #323232
+            new Color(0.149f, 0.149f, 0.149f), // #262626
+            new Color(0.271f, 0.271f, 0.271f), // #383838
+            new Color(0.125f, 0.125f, 0.125f), // #1F1F1F
+            new Color(0.267f, 0.267f, 0.267f)  // #444444
+        };
+
+
+        public override bool useCustomColorData => true;
+        public override float density => 1.8f;
+
+        public TemporalPowder(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos)
+        {
+            if (useCustomColorData && colorData != null && colorData.Length > 0)
+            {
+                this.localColor = colorData[Random.Range(0, colorData.Length - 1)];
+            }
+
+            //Invoke("DieWithTime", lifetime);
+        }
+
+        public void SetCustomColorData(Color[] colors)
+        {
+            _customColorData = colors;
+        }
+
+        public void Die()
+        {
+            SandSimulation.Instance.chunks[chunkPosition].elements[this.localPosition.x, this.localPosition.y] = null;
+            SandSimulation.Instance.chunks[chunkPosition].WakeUpChunkNeighbors(localPosition);
         }
     }
 
