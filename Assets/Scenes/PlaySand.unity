@@ -671,7 +671,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c5c396ae5a73ff46b6e4ecc0270deff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  gameManager: {fileID: 607867750}
+  gamemode: 0
+  difficulty: 0
   checkColorsOnly: 1
+  horizontalMovement: 0
+  defFallSpeed: 0
+  fastFallSpeed: 0
+  chunkSize: 8
   colorDefinitions:
   - colorName: blue
     color: {r: 0.28773582, g: 0.5475029, b: 1, a: 1}
@@ -698,6 +705,8 @@ MonoBehaviour:
     tileSprite: {fileID: 21300000, guid: 3b70ba5e0b53a5240b01ae63d446d906, type: 3}
   elementTypes:
   - sawdust
+  clearAmount: 0
+  highscoreTime: 0
 --- !u!114 &607867750
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -710,6 +719,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4caa3b8fe6459f14abc0178b2818bbdd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  gamemode: 0
+  difficulty: 0
+  clearAmount: 20
+  highScoreTime: 180
   gameDataIndex: {fileID: 607867749}
   simulation: {fileID: 322835528}
   tileColors: []

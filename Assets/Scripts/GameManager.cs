@@ -2,11 +2,19 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 public class GameManager : MonoBehaviour
 {
+    public WitkotrisGamemode gamemode;
+    public WitkotrisDifficulty difficulty;
+
+    //gamemode specific
+    public int clearAmount = 20;
+    public int highScoreTime = 180;
+
     public GameDataIndex gameDataIndex;
     public SandSimulation simulation;
     public List<Color> tileColors = new List<Color>();
@@ -21,6 +29,16 @@ public class GameManager : MonoBehaviour
 
     // Start is called before the first frame update
     void Start()
+    {
+        //Wakeup();
+    }
+
+    private void Awake()
+    {
+        //SandSimulation.Instance.chunkSize = gameDataIndex.chunkSize;
+    }
+
+    public void Wakeup()
     {
         InitializeTiles();
         StartCoroutine(DelayGameStart());
@@ -56,6 +74,15 @@ public class GameManager : MonoBehaviour
         SandSimulation.Instance.checkColorsOnly = gameDataIndex.checkColorsOnly;
         SandSimulation.Instance.colorsToCheck = dataColors;
         SandSimulation.Instance.typesToCheck = elementTypes;
+
+        SandSimulation.Instance.defaultFallSpeed = gameDataIndex.defFallSpeed;
+        SandSimulation.Instance.fastForwardSpeed = gameDataIndex.fastFallSpeed;
+        SandSimulation.Instance.horizontalSpeed = gameDataIndex.horizontalMovement;
+        gamemode = gameDataIndex.gamemode;
+        difficulty = gameDataIndex.difficulty;
+
+        clearAmount = gameDataIndex.clearAmount;
+        highScoreTime = gameDataIndex.highscoreTime;
     }
 
     public void StartGame()
