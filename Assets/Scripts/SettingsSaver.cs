@@ -6,6 +6,7 @@ using UnityEngine;
 
 public class SettingsSaver : MonoBehaviour
 {
+
     public static WitkotrisGamemode gamemode;
     public static WitkotrisDifficulty difficulty;
 

@@ -2072,7 +2072,6 @@ GameObject:
   m_Component:
   - component: {fileID: 607867751}
   - component: {fileID: 607867750}
-  - component: {fileID: 607867749}
   - component: {fileID: 607867752}
   m_Layer: 0
   m_Name: GameManager
@@ -2081,53 +2080,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &607867749
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 607867748}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5c5c396ae5a73ff46b6e4ecc0270deff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  gamemode: 0
-  difficulty: 0
-  checkColorsOnly: 1
-  horizontalMovement: 0
-  defFallSpeed: 0
-  fastFallSpeed: 0
-  chunkSize: 8
-  colorDefinitions:
-  - colorName: blue
-    color: {r: 0.28773582, g: 0.5475029, b: 1, a: 1}
-  - colorName: red
-    color: {r: 1, g: 0.3254717, b: 0.3254717, a: 1}
-  - colorName: yellow
-    color: {r: 0.97619045, g: 1, b: 0, a: 1}
-  - colorName: green
-    color: {r: 0, g: 0.745283, b: 0.17899817, a: 1}
-  tileShapeDefinitions:
-  - tileName: Z
-    tileSprite: {fileID: 21300000, guid: 74173d49af0cd4741917ef64e45c09a1, type: 3}
-  - tileName: InvertedZ
-    tileSprite: {fileID: 21300000, guid: ba6667d606abaa24993c01ec3b69d3d2, type: 3}
-  - tileName: Box
-    tileSprite: {fileID: 21300000, guid: 7973a892eafedab4f9c38b20961fb6cc, type: 3}
-  - tileName: I
-    tileSprite: {fileID: 21300000, guid: 6af2ea7ce143bbe459a66152138f625f, type: 3}
-  - tileName: InvertedL
-    tileSprite: {fileID: 21300000, guid: 40aba1f51b629c24392a324bea15494d, type: 3}
-  - tileName: L
-    tileSprite: {fileID: 21300000, guid: 7ce367c76bc35bf4aa178508212cdf37, type: 3}
-  - tileName: V
-    tileSprite: {fileID: 21300000, guid: 3b70ba5e0b53a5240b01ae63d446d906, type: 3}
-  elementTypes:
-  - sawdust
-  clearAmount: 0
-  highscoreTime: 0
 --- !u!114 &607867750
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2144,11 +2096,11 @@ MonoBehaviour:
   difficulty: 0
   clearAmount: 20
   highScoreTime: 180
-  gameDataIndex: {fileID: 607867749}
   simulation: {fileID: 322835528}
   tileColors: []
   tileSprites: []
   elementTypes: []
+  useLocalData: 1
   tileSpawnpoint: {fileID: 157127251}
 --- !u!4 &607867751
 Transform:
@@ -2219,7 +2171,48 @@ MonoBehaviour:
   - {r: 1, g: 0.3254902, b: 0.3254902, a: 1}
   - {r: 0.9764706, g: 1, b: 0, a: 1}
   - {r: 0, g: 0.74509805, b: 0.18039216, a: 1}
-  sprites:
+  selectedTileStyle: default8
+  defaulteightsprites:
+  - {fileID: 21300000, guid: ba6667d606abaa24993c01ec3b69d3d2, type: 3}
+  - {fileID: 21300000, guid: 74173d49af0cd4741917ef64e45c09a1, type: 3}
+  - {fileID: 21300000, guid: 7973a892eafedab4f9c38b20961fb6cc, type: 3}
+  - {fileID: 21300000, guid: 6af2ea7ce143bbe459a66152138f625f, type: 3}
+  - {fileID: 21300000, guid: 40aba1f51b629c24392a324bea15494d, type: 3}
+  - {fileID: 21300000, guid: 7ce367c76bc35bf4aa178508212cdf37, type: 3}
+  - {fileID: 21300000, guid: 3b70ba5e0b53a5240b01ae63d446d906, type: 3}
+  fancyeightsprites:
+  - {fileID: 21300000, guid: ba6667d606abaa24993c01ec3b69d3d2, type: 3}
+  - {fileID: 21300000, guid: 74173d49af0cd4741917ef64e45c09a1, type: 3}
+  - {fileID: 21300000, guid: 7973a892eafedab4f9c38b20961fb6cc, type: 3}
+  - {fileID: 21300000, guid: 6af2ea7ce143bbe459a66152138f625f, type: 3}
+  - {fileID: 21300000, guid: 40aba1f51b629c24392a324bea15494d, type: 3}
+  - {fileID: 21300000, guid: 7ce367c76bc35bf4aa178508212cdf37, type: 3}
+  - {fileID: 21300000, guid: 3b70ba5e0b53a5240b01ae63d446d906, type: 3}
+  defaultsixteensprites:
+  - {fileID: 21300000, guid: ba6667d606abaa24993c01ec3b69d3d2, type: 3}
+  - {fileID: 21300000, guid: 74173d49af0cd4741917ef64e45c09a1, type: 3}
+  - {fileID: 21300000, guid: 7973a892eafedab4f9c38b20961fb6cc, type: 3}
+  - {fileID: 21300000, guid: 6af2ea7ce143bbe459a66152138f625f, type: 3}
+  - {fileID: 21300000, guid: 40aba1f51b629c24392a324bea15494d, type: 3}
+  - {fileID: 21300000, guid: 7ce367c76bc35bf4aa178508212cdf37, type: 3}
+  - {fileID: 21300000, guid: 3b70ba5e0b53a5240b01ae63d446d906, type: 3}
+  fancysixteensprites:
+  - {fileID: 21300000, guid: ba6667d606abaa24993c01ec3b69d3d2, type: 3}
+  - {fileID: 21300000, guid: 74173d49af0cd4741917ef64e45c09a1, type: 3}
+  - {fileID: 21300000, guid: 7973a892eafedab4f9c38b20961fb6cc, type: 3}
+  - {fileID: 21300000, guid: 6af2ea7ce143bbe459a66152138f625f, type: 3}
+  - {fileID: 21300000, guid: 40aba1f51b629c24392a324bea15494d, type: 3}
+  - {fileID: 21300000, guid: 7ce367c76bc35bf4aa178508212cdf37, type: 3}
+  - {fileID: 21300000, guid: 3b70ba5e0b53a5240b01ae63d446d906, type: 3}
+  defaultfoursprites:
+  - {fileID: 21300000, guid: ba6667d606abaa24993c01ec3b69d3d2, type: 3}
+  - {fileID: 21300000, guid: 74173d49af0cd4741917ef64e45c09a1, type: 3}
+  - {fileID: 21300000, guid: 7973a892eafedab4f9c38b20961fb6cc, type: 3}
+  - {fileID: 21300000, guid: 6af2ea7ce143bbe459a66152138f625f, type: 3}
+  - {fileID: 21300000, guid: 40aba1f51b629c24392a324bea15494d, type: 3}
+  - {fileID: 21300000, guid: 7ce367c76bc35bf4aa178508212cdf37, type: 3}
+  - {fileID: 21300000, guid: 3b70ba5e0b53a5240b01ae63d446d906, type: 3}
+  fancyfoursprites:
   - {fileID: 21300000, guid: ba6667d606abaa24993c01ec3b69d3d2, type: 3}
   - {fileID: 21300000, guid: 74173d49af0cd4741917ef64e45c09a1, type: 3}
   - {fileID: 21300000, guid: 7973a892eafedab4f9c38b20961fb6cc, type: 3}
@@ -2231,6 +2224,7 @@ MonoBehaviour:
   difficultyInfoText: {fileID: 771125359}
   menuAnimator: {fileID: 1873532797}
   mobileControlsAnimator: {fileID: 1684591938}
+  powderDrawer: {fileID: 1006537045}
 --- !u!1 &609018380
 GameObject:
   m_ObjectHideFlags: 0
@@ -5893,7 +5887,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: TILE PATTERN
+  m_text: Just Relax, tiles go slowly
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: f04db93fd2ca3b545a1d7752b7e2701a, type: 2}
   m_sharedMaterial: {fileID: -6433663157066105471, guid: f04db93fd2ca3b545a1d7752b7e2701a, type: 2}
@@ -8644,6 +8638,7 @@ GameObject:
   - component: {fileID: 1684591936}
   - component: {fileID: 1684591935}
   - component: {fileID: 1684591938}
+  - component: {fileID: 1684591939}
   m_Layer: 5
   m_Name: TouchControls
   m_TagString: Untagged
@@ -8713,7 +8708,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 0, g: 0, b: 0, a: 0}
-  m_RaycastTarget: 1
+  m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -8758,6 +8753,18 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!225 &1684591939
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1684591933}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &1707230353
 GameObject:
   m_ObjectHideFlags: 0

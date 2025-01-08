@@ -1,10 +1,13 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using static SandSimulation;
+using Debug = UnityEngine.Debug;
 using Random = UnityEngine.Random;
 
 public class SandSimulation : MonoBehaviour
@@ -66,6 +69,7 @@ public class SandSimulation : MonoBehaviour
     private void Awake()
     {
         Instance = this;
+        //this.chunkSize = SettingsSaver.chunkSize;
     }
 
     void Start()
@@ -244,17 +248,19 @@ public class SandSimulation : MonoBehaviour
     {
         this.isSimPaused = true;
 
+        /*
         foreach (var (chunkPos, localPos) in elementsToRemove)
         {
             Chunk chunk = chunks[chunkPos];
             chunk.elements[localPos.x, localPos.y].LocalColor = Color.white;
-        }
+        }*/
 
         foreach (var (chunkPos, localPos) in elementsToRemove)
         {
             Chunk chunk = chunks[chunkPos];
             chunk.elements[localPos.x, localPos.y] = null;
             chunk.isActive = true;
+            gameManager.AddScore(1);
         }
 
         this.isSimPaused = false;
@@ -263,9 +269,11 @@ public class SandSimulation : MonoBehaviour
 
     // INPUT LOGIC
 
-    public void CreateTempElement(Vector2 pos)
+    public void CreateTempElement(Vector2 pos, out Element TempElem)
     {
         string elementName = "tempelement";
+
+        TempElem = null;
 
         Vector2 worldPos = pos;
 
@@ -320,7 +328,8 @@ public class SandSimulation : MonoBehaviour
                 {
                     Element tempElement = null;
                     chunks[chunkPos].AddElement(localPos, out tempElement, elementName);
-                    if(tempElement != null) StartCoroutine(KillTempElement(tempElement));
+                    TempElem = tempElement;
+                    if (tempElement != null) StartCoroutine(KillTempElement(tempElement));
                     if (interactionUpdatesEnvironment) chunks[chunkPos].WakeUpParticleNeighbors(localPos, chunkPos);
                 }
             }
@@ -329,11 +338,14 @@ public class SandSimulation : MonoBehaviour
 
     public IEnumerator KillTempElement(Element e)
     {
-        if(e.GetType() == typeof(TemporalPowder))
+        if(e != null)
         {
-            yield return new WaitForSecondsRealtime(25f);
-            (e as TemporalPowder).Die();
-            //print("dead!");
+            if (e.GetType() == typeof(TemporalPowder))
+            {
+                yield return new WaitForSecondsRealtime(25f);
+                (e as TemporalPowder).Die();
+                //print("dead!");
+            }
         }
     }
 
@@ -836,6 +848,26 @@ public class SandSimulation : MonoBehaviour
             {
                 Debug.LogWarning($"Particle destroyed during evacuation after {maxAttempts} failed placement attempts");
             }
+        }
+    }
+
+    public void TriggerGameOver()
+    {
+        StartCoroutine(GameoverScreen());
+    }
+
+    public IEnumerator GameoverScreen()
+    {
+        foreach(Chunk ch in this.chunks.Values)
+        {
+            yield return new WaitForSecondsRealtime(0.000001f);
+            EvacuateChunk(ch.chunkPosition);
+        }
+
+        foreach (Chunk ch in this.chunks.Values)
+        {
+            yield return new WaitForSecondsRealtime(0.000001f);
+            EvacuateChunk(ch.chunkPosition);
         }
     }
 
@@ -1469,12 +1501,16 @@ public class SandSimulation : MonoBehaviour
         public Sprite tileShapeSprite = null;
         public Sprite rotatedSprite = null;
         private bool initialized = false;
+        private Stopwatch timer;
 
         public WitkotrisBlock(Vector2 objectPos) : base(objectPos)
         {
             objectPosition = objectPos;
             initialized = false;
             //InitializeBlock();
+            timer = new Stopwatch();
+            timer.Reset();
+            timer.Start();
         }
 
         public void InitializeBlock()
@@ -2164,6 +2200,18 @@ public class SandSimulation : MonoBehaviour
                 SandSimulation.Instance.gameManager.TriggerNextTile();
             }
 
+            if(timer != null)
+            {
+                timer.Stop();
+                if(timer.ElapsedMilliseconds <= 200)
+                {
+                    if (SandSimulation.Instance.gameManager != null)
+                    {
+                        SandSimulation.Instance.gameManager.Gameover();
+                    }
+                }
+            }
+
             this.moveRight = false;
             this.moveLeft = false;
             isGranularized = true;
@@ -2405,6 +2453,11 @@ public class SandSimulation : MonoBehaviour
             horizontalVelocity = 0f;
             hasContactBelow = false;
             hasContactAbove = false;
+        }
+
+        public void Die()
+        {
+            SandSimulation.Instance.chunks[this.chunkPosition].elements[this.localPosition.x, this.localPosition.y] = null;
         }
 
         // In your Element class:

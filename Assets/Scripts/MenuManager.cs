@@ -223,33 +223,37 @@ public class MenuManager : MonoBehaviour
         SettingsSaver.colors.Clear();
         SettingsSaver.elements.Clear();
 
-        if(selectedTileStyle == "default8")
+        //default in case no
+        SettingsSaver.tiles = new List<Sprite>(this.defaulteightsprites);
+        SettingsSaver.chunkSize = 8;
+
+        if (selectedTileStyle == "default8")
         {
-            SettingsSaver.tiles = this.defaulteightsprites;
+            SettingsSaver.tiles = new List<Sprite>(this.defaulteightsprites);
             SettingsSaver.chunkSize = 8;
         }else if (selectedTileStyle == "fancy8")
         {
-            SettingsSaver.tiles = this.fancyeightsprites;
+            SettingsSaver.tiles = new List<Sprite>(this.fancyeightsprites);
             SettingsSaver.chunkSize = 8;
         }
         else if (selectedTileStyle == "default16")
         {
-            SettingsSaver.tiles = this.defaultsixteensprites;
+            SettingsSaver.tiles = new List<Sprite>(this.defaultsixteensprites);
             SettingsSaver.chunkSize = 16;
         }
         else if (selectedTileStyle == "fancy16")
         {
-            SettingsSaver.tiles = this.fancysixteensprites;
+            SettingsSaver.tiles = new List<Sprite>(this.fancysixteensprites);
             SettingsSaver.chunkSize = 16;
         }
         else if (selectedTileStyle == "default4")
         {
-            SettingsSaver.tiles = this.defaultfoursprites;
+            SettingsSaver.tiles = new List<Sprite>(this.defaultfoursprites);
             SettingsSaver.chunkSize = 4;
         }
         else if (selectedTileStyle == "fancy4")
         {
-            SettingsSaver.tiles = this.fancyfoursprites;
+            SettingsSaver.tiles = new List<Sprite>(this.fancyfoursprites);
             SettingsSaver.chunkSize = 4;
         }
 
@@ -417,7 +421,7 @@ public class MenuManager : MonoBehaviour
         }
 
         SettingsSaver.elements = this.elementTypes;
-        SettingsSaver.tiles = this.defaulteightsprites;
+        //SettingsSaver.tiles = this.defaulteightsprites;
         SettingsSaver.colors = this.colors;
         SettingsSaver.chunkSize = this.chunkSize;
     }
@@ -426,13 +430,18 @@ public class MenuManager : MonoBehaviour
     public Animator mobileControlsAnimator;
     public void StartGame()
     {
+        SaveSettings();
+
         menuAnimator.SetTrigger("hide");
         mobileControlsAnimator.SetTrigger("start");
         StartCoroutine(DelayStart());
     }
 
+    public PowderDrawer powderDrawer;
+
     private IEnumerator DelayStart()
     {
+        powderDrawer.StopAndClear();
         yield return new WaitForSeconds(0.5f);
         SceneManager.LoadSceneAsync("PlaySand");
     }

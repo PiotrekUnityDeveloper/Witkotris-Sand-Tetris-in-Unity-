@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 
 public class GameManager : MonoBehaviour
@@ -15,7 +18,7 @@ public class GameManager : MonoBehaviour
     public int clearAmount = 20;
     public int highScoreTime = 180;
 
-    public GameDataIndex gameDataIndex;
+    //public GameDataIndex gameDataIndex;
     public SandSimulation simulation;
     public List<Color> tileColors = new List<Color>();
     public List<Sprite> tileSprites = new List<Sprite>();
@@ -24,13 +27,13 @@ public class GameManager : MonoBehaviour
     // used for clearline checks
     public List<Color[]> dataColors = new List<Color[]>();
 
-    
+    public bool useLocalData = true;
     public Transform tileSpawnpoint;
 
     // Start is called before the first frame update
     void Start()
     {
-        //Wakeup();
+        Wakeup();
     }
 
     private void Awake()
@@ -46,24 +49,13 @@ public class GameManager : MonoBehaviour
 
     public void InitializeTiles()
     {
-        foreach(ColorDef colordef in gameDataIndex.colorDefinitions)
-        {
-            this.tileColors.Add(colordef.color);
-        }
-
-        foreach(TileShapeDef shapedef in gameDataIndex.tileShapeDefinitions)
-        {
-            this.tileSprites.Add(shapedef.tileSprite);
-        }
-
-        foreach(string etype in gameDataIndex.elementTypes)
-        {
-            this.elementTypes.Add(etype);
-        }
+        this.tileColors = SettingsSaver.colors;
+        this.tileSprites = SettingsSaver.tiles;
+        this.elementTypes = SettingsSaver.elements;
 
 
         //assuming each tilesprite has the same pallete of colors (if not, use a double loop)
-        if(tileSprites.Count > 0)
+        if (tileSprites.Count > 0)
         {
             foreach (Color color in this.tileColors)
             {
@@ -71,18 +63,19 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        SandSimulation.Instance.checkColorsOnly = gameDataIndex.checkColorsOnly;
+        SandSimulation.Instance.checkColorsOnly = SettingsSaver.checkColorsOnly;
         SandSimulation.Instance.colorsToCheck = dataColors;
         SandSimulation.Instance.typesToCheck = elementTypes;
 
-        SandSimulation.Instance.defaultFallSpeed = gameDataIndex.defFallSpeed;
-        SandSimulation.Instance.fastForwardSpeed = gameDataIndex.fastFallSpeed;
-        SandSimulation.Instance.horizontalSpeed = gameDataIndex.horizontalMovement;
-        gamemode = gameDataIndex.gamemode;
-        difficulty = gameDataIndex.difficulty;
 
-        clearAmount = gameDataIndex.clearAmount;
-        highScoreTime = gameDataIndex.highscoreTime;
+        SandSimulation.Instance.defaultFallSpeed = SettingsSaver.defaultSpeed;
+        SandSimulation.Instance.fastForwardSpeed = SettingsSaver.fastForwardSpeed;
+        SandSimulation.Instance.horizontalSpeed = SettingsSaver.horizontalSpeed;
+        gamemode = SettingsSaver.gamemode;
+        difficulty = SettingsSaver.difficulty;
+
+        clearAmount = SettingsSaver.clearAmount;
+        highScoreTime = SettingsSaver.highscoretime;
     }
 
     public void StartGame()
@@ -102,35 +95,39 @@ public class GameManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+
+        //if (isGameOver) return;
+
+
         // ROTATE TILE
-        if (Input.GetKeyDown(KeyCode.UpArrow))
+        if (Input.GetKeyDown(KeyCode.UpArrow) && !isGameOver)
         {
             Rotate();
         }
 
         // HORIZONTAL MOVEMENT
-        if (Input.GetKeyDown(KeyCode.RightArrow))
+        if (Input.GetKeyDown(KeyCode.RightArrow) && !isGameOver)
         {
             MoveRight();
         }
 
-        if (Input.GetKeyDown(KeyCode.LeftArrow))
+        if (Input.GetKeyDown(KeyCode.LeftArrow) && !isGameOver)
         {
             MoveLeft();
         }
 
         if(Input.GetKeyUp(KeyCode.RightArrow) || Input.GetKeyUp(KeyCode.LeftArrow))
         {
-            StopMove();
+            if(!isGameOver) StopMove();
         }
 
         // FAST FORWARD
-        if (Input.GetKeyDown(KeyCode.DownArrow))
+        if (Input.GetKeyDown(KeyCode.DownArrow) && !isGameOver)
         {
             FastForward();
         }
 
-        if (Input.GetKeyUp(KeyCode.DownArrow))
+        if (Input.GetKeyUp(KeyCode.DownArrow) && !isGameOver)
         {
             StopFastForward();
         }
@@ -138,31 +135,34 @@ public class GameManager : MonoBehaviour
 
     public void MoveLeft()
     {
-        simulation.MoveTileLeft();
+        if (!isGameOver) { simulation.MoveTileLeft(); } else { BackToMenu(); }
     }
 
     public void MoveRight()
     {
-        simulation.MoveTileRight();
+        if (!isGameOver) { simulation.MoveTileRight(); }
     }
 
     public void StopMove()
     {
+        if(isGameOver) return;
         simulation.StopTileMovement();
     }
 
     public void Rotate()
     {
-        simulation.RotateSimObject();
+        if (!isGameOver) { simulation.RotateSimObject(); } else { ResetGame(); } 
     }
 
     public void FastForward()
     {
+        if (isGameOver) return;
         simulation.FastForwardFall();
     }
 
     public void StopFastForward()
     {
+        if (isGameOver) return;
         simulation.StopFastFall();
     }
 
@@ -170,12 +170,44 @@ public class GameManager : MonoBehaviour
 
     public void TriggerNextTile()
     {
+        if(isGameOver) return;
+
         StartCoroutine(DelayNextTile());
 
         if(lineChecker == null)
         {
             lineChecker = SandSimulation.Instance.StartCoroutine(SandSimulation.Instance.CheckForClearLineLoop());
         }
+    }
+
+    public TMP_Text totalScoreText;
+    public int totalScore = 0;
+    public void AddScore(int scoreNum)
+    {
+        totalScore += scoreNum;
+        totalScoreText.text = totalScore.ToString();
+    }
+
+    
+
+    public bool isGameOver = false;
+    public GameObject gameoverobject;
+
+    public void Gameover()
+    {
+        gameoverobject.SetActive(true);
+        SandSimulation.Instance.TriggerGameOver();
+        this.isGameOver = true;
+    }
+
+    public void ResetGame()
+    {
+        SceneManager.LoadSceneAsync(SceneManager.GetActiveScene().name);
+    }
+
+    public void BackToMenu()
+    {
+        SceneManager.LoadSceneAsync("SandMenu");
     }
 
     public IEnumerator DelayNextTile()
@@ -191,7 +223,8 @@ public class GameManager : MonoBehaviour
 
     public Sprite GetRandomTileSprite()
     {
-        return tileSprites[Random.Range(0, tileSprites.Count)];
+        //return tileSprites[Random.Range(0, tileSprites.Count)];
+        return SettingsSaver.tiles[Random.Range(0, SettingsSaver.tiles.Count)];
     }
 
     public string GetRandomElementType()
