@@ -23,7 +23,7 @@ public class MenuManager : MonoBehaviour
         
     }
 
-    public WitkotrisGamemode selectedGamemode = WitkotrisGamemode.DEFAULT;
+    //public WitkotrisGamemode selectedGamemode = WitkotrisGamemode.DEFAULT;
 
     public bool uiPaused = false;
 
@@ -89,7 +89,7 @@ public class MenuManager : MonoBehaviour
     public void SetGamemode(string gamemode)
     {
         gamemodeButtonText.text = gamemode.ToUpper();
-        selectedGamemode = (WitkotrisGamemode)Enum.Parse(typeof(WitkotrisGamemode), gamemode.ToUpper());
+        witkotrisGamemode = (WitkotrisGamemode)Enum.Parse(typeof(WitkotrisGamemode), gamemode.ToUpper());
 
         defaultDescription.SetActive(false);
         highscoreDescription.SetActive(false);
@@ -494,6 +494,8 @@ public class MenuManager : MonoBehaviour
             SettingsSaver.defaultSpeed = (int)fallSpeed.value;
             SettingsSaver.fastForwardSpeed = (int)ffSpeed.value;
 
+            SettingsSaver.elements.Clear();
+
             if (usepowder.isOn)
             {
                 SettingsSaver.elements.Add("sand");
@@ -585,10 +587,10 @@ public class MenuManager : MonoBehaviour
             }
         }
 
-        SettingsSaver.elements = this.elementTypes;
+        if(witkotrisGamemode != WitkotrisGamemode.CUSTOM) SettingsSaver.elements = this.elementTypes;
         //SettingsSaver.tiles = this.defaulteightsprites;
-        SettingsSaver.colors = this.colors;
-        SettingsSaver.chunkSize = this.chunkSize;
+        if (witkotrisGamemode != WitkotrisGamemode.CUSTOM) SettingsSaver.colors = this.colors;
+        //SettingsSaver.chunkSize = this.chunkSize;
     }
 
     public Toggle impossile;
@@ -612,7 +614,7 @@ public class MenuManager : MonoBehaviour
 
     public void SetAsCustom()
     {
-        this.selectedGamemode = WitkotrisGamemode.CUSTOM;
+        this.witkotrisGamemode = WitkotrisGamemode.CUSTOM;
         gamemodeButtonText.text = "CUSTOM";
     }
 

@@ -21,7 +21,7 @@ public class SettingsSaver : MonoBehaviour
     public static List<Color> colors = new List<Color>();
     public static List<string> elements = new List<string>();
 
-    public static int chunkSize;
+    public static int chunkSize = 8;
 
     //gamemode specific
     public static int highscoretime; // in seconds

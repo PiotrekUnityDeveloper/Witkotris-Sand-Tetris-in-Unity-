@@ -5571,7 +5571,7 @@ MonoBehaviour:
   highscoreDescription: {fileID: 1376698329}
   clearDescription: {fileID: 83134459}
   chaosDescription: {fileID: 1098381414}
-  settingsWindow: {fileID: 0}
+  settingsWindow: {fileID: 742757985}
   defaultImage: {fileID: 1557078823}
   highscoreImage: {fileID: 696580454}
   clearImage: {fileID: 675328932}

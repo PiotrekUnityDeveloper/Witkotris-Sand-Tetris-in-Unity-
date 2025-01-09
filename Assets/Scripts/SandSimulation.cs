@@ -1057,7 +1057,7 @@ public class SandSimulation : MonoBehaviour
                         e = newParticle;
                         break;
                     case "flour":
-                        newParticle = new SawDust(localPos, chunkPosition);
+                        newParticle = new Flour(localPos, chunkPosition);
                         e = newParticle;
                         break;
                     case "bricks":

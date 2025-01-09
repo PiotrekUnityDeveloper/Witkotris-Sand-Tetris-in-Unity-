@@ -105,6 +105,7 @@ public class GameManager : MonoBehaviour
         if(gamemode == WitkotrisGamemode.CLEAR)
         {
             clearCount -= 1;
+            extraText.text = SettingsSaver.clearAmount + "/" + clearCount + " clears left";
 
             if (clearCount <= 0)
             {
@@ -119,9 +120,9 @@ public class GameManager : MonoBehaviour
     {
         yield return new WaitForSeconds(1f);
         timeCount -= 1;
-        extraText.text = timeCount.ToString();
+        extraText.text = timeCount.ToString() + " seconds left";
 
-        if(timeCount <= 0)
+        if (timeCount <= 0)
         {
             Gameover();
         }

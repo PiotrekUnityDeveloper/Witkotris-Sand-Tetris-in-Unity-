@@ -12,9 +12,16 @@ public class MusicPlayer : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        instance = this;
+        if(instance == null)
+        {
+            instance = this;
+        }
+        else
+        {
+            Destroy(this.gameObject);
+        }
         DontDestroyOnLoad(this);
-        PlayRandomSong();
+        if(GetComponent<AudioSource>() == null) PlayRandomSong();
     }
 
     // Update is called once per frame
@@ -72,13 +79,14 @@ public class MusicPlayer : MonoBehaviour
 
     public void StopMusic()
     {
+        if(GetComponent<AudioSource>() != null) globalSrc.Stop();
         globalSrc = null;
         Destroy(globalSrc);
     }
 
     public void ToggleMusic()
     {
-        if (globalSrc != null) { StopMusic(); } else
+        if (GetComponent<AudioSource>() != null) { StopMusic(); } else
         {
             PlayRandomSong();
         }
@@ -88,7 +96,7 @@ public class MusicPlayer : MonoBehaviour
 
     public void DifferentSong()
     {
-        if(globalSrc != null) { StopMusic(); }
+        if(GetComponent<AudioSource>() != null) { StopMusic(); }
 
         lastSong += 1;
         if(lastSong > clips.Count - 1)
