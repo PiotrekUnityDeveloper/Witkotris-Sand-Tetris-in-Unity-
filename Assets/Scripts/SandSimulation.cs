@@ -220,6 +220,19 @@ public class SandSimulation : MonoBehaviour
                         }
                     }
                 }
+                else if (etype == "bricks")
+                {
+                    foreach (Color[] colorsRem in colorsToCheck)
+                    {
+                        HashSet<(Vector2Int, Vector2Int)> foundElements = new HashSet<(Vector2Int, Vector2Int)>();
+                        bool isConnectedSand = EdgeConnectionChecker.CheckTypeConnectsBorders<Bricks>(chunks, out foundElements, colorsRem);
+                        if (isConnectedSand)
+                        {
+                            Debug.Log("found a connection!");
+                            ClearLine(foundElements);
+                        }
+                    }
+                }
             }
         }
         else
@@ -261,7 +274,10 @@ public class SandSimulation : MonoBehaviour
             chunk.elements[localPos.x, localPos.y] = null;
             chunk.isActive = true;
             gameManager.AddScore(1);
+            
         }
+
+        gameManager.CountClear();
 
         this.isSimPaused = false;
     }
@@ -1044,6 +1060,10 @@ public class SandSimulation : MonoBehaviour
                         newParticle = new SawDust(localPos, chunkPosition);
                         e = newParticle;
                         break;
+                    case "bricks":
+                        newParticle = new Bricks(localPos, chunkPosition);
+                        e = newParticle;
+                        break;
                     case "tempelement":
                         newParticle = new TemporalPowder(localPos, chunkPosition);
                         e = newParticle;
@@ -1726,6 +1746,36 @@ public class SandSimulation : MonoBehaviour
                     //chunkToAdd.isActiveNextFrame = true;
                 }
             }
+            else if (elementType == "bricks")
+            {
+                Bricks e_bricks = new Bricks(localPos, chunkPos);
+                Vector2Int adjustedLocal = e_bricks.AdjustPositionForChunk(localPos, ref chunkPos, SandSimulation.Instance.chunkSize);
+
+                /// Debug visualization
+                ///Vector3 debugWorldPos = SimulationCoordinateConverter.ChunkToWorldPosition(chunkPos, adjustedLocal,
+                ///    SandSimulation.Instance.chunkSize);
+                ///Debug.DrawLine(debugWorldPos, debugWorldPos + Vector3.forward * 0.01f, Color.red, 5.0f);
+
+                e_bricks.localPosition = adjustedLocal;
+                e_bricks.chunkPosition = chunkPos;
+                e_bricks.useCustomColorData = true;
+                e_bricks.LocalColor = finalColor;
+                //add color data for the borderedge algorithm
+                //e_sand.colorData = colorData.ToArray();
+                e_bricks.SetCustomColorData(colorData.ToArray());
+                e_bricks.containedInObject = true;
+                e_bricks.containingObject = this;
+
+                if (SandSimulation.Instance.chunks.TryGetValue(chunkPos, out Chunk chunkToAdd) && chunkToAdd != null)
+                {
+                    chunkToAdd.AddCustomElement(localPos, e_bricks);
+                    this.containedElements.Add(e_bricks);
+                    // Make sure the chunk is active
+                    //chunkToAdd.isActive = true;
+                    //chunkToAdd.isActiveNextFrame = true;
+                }
+            }
+
 
         }
 
@@ -2076,7 +2126,81 @@ public class SandSimulation : MonoBehaviour
                         }
                     }
                 }
+                else if (elementType == "bricks")
+                {
+                    if (!element.containedInObject) continue;
+                    if (isGranularized) return;
 
+                    Bricks bricks = element as Bricks;
+                    Vector2Int chunkPOS = bricks.chunkPosition;
+                    Vector2 relativeObjPos;
+                    Vector2Int targetPos;
+
+                    if (moveRight && moveLeft)
+                    {
+                        relativeObjPos = new Vector2(0, -SandSimulation.Instance.fallSpeed);
+                        targetPos = bricks.AdjustPositionForChunk(
+                            new Vector2Int(bricks.localPosition.x, bricks.localPosition.y - SandSimulation.Instance.fallSpeed),
+                            ref chunkPOS,
+                            SandSimulation.Instance.chunkSize
+                        );
+                    }
+                    else if (moveRight && !outOfBoundsRight)
+                    {
+                        relativeObjPos = new Vector2(SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
+                        targetPos = bricks.AdjustPositionForChunk(
+                            new Vector2Int(bricks.localPosition.x + SandSimulation.Instance.horizontalSpeed, bricks.localPosition.y - SandSimulation.Instance.fallSpeed),
+                            ref chunkPOS,
+                            SandSimulation.Instance.chunkSize
+                        );
+                    }
+                    else if (moveLeft && !outOfBoundsLeft)
+                    {
+                        relativeObjPos = new Vector2(-SandSimulation.Instance.horizontalSpeed, -SandSimulation.Instance.fallSpeed);
+                        targetPos = bricks.AdjustPositionForChunk(
+                            new Vector2Int(bricks.localPosition.x - SandSimulation.Instance.horizontalSpeed, bricks.localPosition.y - SandSimulation.Instance.fallSpeed),
+                            ref chunkPOS,
+                            SandSimulation.Instance.chunkSize
+                        );
+                    }
+                    else
+                    {
+                        relativeObjPos = new Vector2(0, -SandSimulation.Instance.fallSpeed);
+                        targetPos = bricks.AdjustPositionForChunk(
+                            new Vector2Int(bricks.localPosition.x, bricks.localPosition.y - SandSimulation.Instance.fallSpeed),
+                            ref chunkPOS,
+                            SandSimulation.Instance.chunkSize
+                        );
+                    }
+
+                    if (SandSimulation.Instance.chunks.TryGetValue(chunkPOS, out Chunk targetChunkObject))
+                    {
+                        targetChunkObject.isActive = true;
+                        targetChunkObject.isActiveNextFrame = true;
+
+                        Vector3Int tilePosition = bricks.GetTilemapPosition(targetPos, chunkPOS);
+                        bool isEmpty = !SandSimulation.Instance.collisionTilemap.HasTile(tilePosition) &&
+                                     (targetChunkObject.elements[targetPos.x, targetPos.y] == null ||
+                                      targetChunkObject.elements[targetPos.x, targetPos.y].containedInObject);
+
+                        if (SandSimulation.Instance.chunks.TryGetValue(bricks.chunkPosition, out Chunk sandChunk))
+                        {
+                            sandChunk.isActive = true;
+                            sandChunk.isActiveNextFrame = true;
+
+                            if (isEmpty && sandChunk != null)
+                            {
+                                moves[bricks] = (targetPos, chunkPOS);
+                                totalMovement += relativeObjPos;
+                            }
+                            else
+                            {
+                                Granularize();
+                                return;
+                            }
+                        }
+                    }
+                }
 
             }
 
@@ -2159,6 +2283,23 @@ public class SandSimulation : MonoBehaviour
                     newChunkPos = e.chunkPosition;
                     targetPos = (e as Flour).AdjustPositionForChunk(
                             new Vector2Int((e as Flour).localPosition.x + targetPos.x, (e as Flour).localPosition.y + targetPos.y),
+                            ref newChunkPos,
+                            SandSimulation.Instance.chunkSize
+                        );
+
+                    if (!SandSimulation.Instance.chunks.ContainsKey(newChunkPos))
+                    {
+                        return true; // out of bounds
+                    }
+                }
+            }
+            else if (elementType == "bricks")
+            {
+                foreach (Element e in containedElements)
+                {
+                    newChunkPos = e.chunkPosition;
+                    targetPos = (e as Flour).AdjustPositionForChunk(
+                            new Vector2Int((e as Bricks).localPosition.x + targetPos.x, (e as Bricks).localPosition.y + targetPos.y),
                             ref newChunkPos,
                             SandSimulation.Instance.chunkSize
                         );
@@ -2800,6 +2941,289 @@ public class SandSimulation : MonoBehaviour
                 //currentChunk.WakeUpAllChunkNeighbors(true);
                 currentChunk.WakeUpChunkNeighbors(localPosition, true);
                 if(lastPosition != null) currentChunk.WakeUpChunkNeighbors(lastPosition.Value, true);
+            }
+
+            if (lastPosition != null)
+            {
+                if (localPosition == lastPosition)
+                {
+                    isResting = true;
+                }
+                else if (nextMoveChunk != null)
+                {
+                    nextMoveChunk.isActiveNextFrame = true;
+                    //currentChunk.WakeUpAllChunkNeighbors(true);
+                    currentChunk.WakeUpChunkNeighbors(localPosition, true);
+                    if (lastPosition != null) currentChunk.WakeUpChunkNeighbors(lastPosition.Value, true);
+                }
+            }
+            else
+            {
+                lastPosition = localPosition;
+                if (nextMoveChunk != null)
+                {
+                    nextMoveChunk.isActiveNextFrame = true;
+                    //currentChunk.WakeUpAllChunkNeighbors(true);
+                    currentChunk.WakeUpChunkNeighbors(localPosition, true);
+                }
+            }
+        }
+
+        private bool CanSinkInLiquid(Element particle)
+        {
+            if (particle == null) return false;
+
+            if (particle.GetType() == typeof(LiquidElement))
+            {
+                LiquidElement liquid = particle as LiquidElement;
+                float densityDiff = density - liquid.density;
+
+                if (densityDiff > 0)
+                {
+                    return true;
+                }
+                else { return false; }
+            }
+            else if (particle.GetType() == typeof(PowderElement))
+            {
+                return false; //powders can sink in each other too, but for now its not added yet
+            }
+
+            return false;
+        }
+
+        private bool TrySwapWithLiquid(Vector2Int targetPos, Vector2Int targetChunkPos, Chunk currentChunk, float swapChance)
+        {
+            if (SandSimulation.Instance.chunks.TryGetValue(targetChunkPos, out Chunk targetChunkObj))
+            {
+                var particle = targetChunkObj.elements[targetPos.x, targetPos.y];
+                if (particle is LiquidElement liquid)
+                {
+                    float densityDiff = density - liquid.density;
+                    if (densityDiff > 0 && Random.value < (swapChance * Mathf.Min(densityDiff, 1f)))
+                    {
+                        // Perform the swap
+                        if (targetChunkPos == chunkPosition)
+                        {
+                            // Same chunk swap
+                            currentChunk.elements[localPosition.x, localPosition.y] = liquid;
+                            currentChunk.elements[targetPos.x, targetPos.y] = this;
+                            liquid.localPosition = localPosition;
+                            localPosition = targetPos;
+                        }
+                        else
+                        {
+                            // Cross-chunk swap
+                            currentChunk.elements[localPosition.x, localPosition.y] = liquid;
+                            targetChunkObj.elements[targetPos.x, targetPos.y] = this;
+                            liquid.localPosition = localPosition;
+                            liquid.chunkPosition = chunkPosition;
+                            localPosition = targetPos;
+                            chunkPosition = targetChunkPos;
+                            targetChunkObj.isActive = true;
+                        }
+                        // Reduce horizontal velocity when sinking
+                        horizontalVelocity *= 0.8f;
+                        return true;
+                    }
+                    else
+                    {
+                        currentChunk.WakeUpChunkNeighbors(localPosition, true);
+                    }
+                }
+            }
+            return false;
+        }
+
+        public Vector2Int AdjustPositionForChunk(Vector2Int position, ref Vector2Int chunkPos, int chunkSize)
+        {
+            Vector2Int adjustedPos = position;
+
+            // Handle vertical boundaries
+            if (adjustedPos.y < 0)
+            {
+                adjustedPos.y = chunkSize - 1;
+                chunkPos.y -= 1;
+            }
+            else if (adjustedPos.y >= chunkSize)
+            {
+                adjustedPos.y = 0;
+                chunkPos.y += 1;
+            }
+
+            // Handle horizontal boundaries
+            if (adjustedPos.x < 0)
+            {
+                adjustedPos.x = chunkSize - 1;
+                chunkPos.x -= 1;
+            }
+            else if (adjustedPos.x >= chunkSize)
+            {
+                adjustedPos.x = 0;
+                chunkPos.x += 1;
+            }
+
+            return adjustedPos;
+        }
+
+        public Vector3Int GetTilemapPosition(Vector2Int localPos, Vector2Int chunkPos)
+        {
+            // Simply use the chunk position as the tilemap position since 1 tile = 1 chunk
+            return new Vector3Int(chunkPos.x, chunkPos.y, 0);
+        }
+
+        public bool MoveToNewPosition(Vector2Int newPos, Vector2Int newChunkPos, Chunk currentChunk, Chunk targetChunk)
+        {
+            if (currentChunk == targetChunk)
+            {
+                // Same chunk movement
+                currentChunk.elements[localPosition.x, localPosition.y] = null;
+                currentChunk.elements[newPos.x, newPos.y] = this;
+                localPosition = newPos;
+                return true;
+            }
+            else
+            {
+                // Cross-chunk movement
+                currentChunk.elements[localPosition.x, localPosition.y] = null;
+                targetChunk.elements[newPos.x, newPos.y] = this;
+                localPosition = newPos;
+                chunkPosition = newChunkPos;
+                targetChunk.isActive = true;
+                return true;
+            }
+        }
+
+        public bool MoveToNewPositionCST(Vector2Int newPos, Vector2Int newChunkPos, Chunk currentChunk, Chunk targetChunk, Vector2Int currentPos)
+        {
+            if (currentChunk == targetChunk)
+            {
+                // Same chunk movement
+                currentChunk.elements[currentPos.x, currentPos.y] = null;
+                currentChunk.elements[newPos.x, newPos.y] = this;
+                localPosition = newPos;
+                return true;
+            }
+            else
+            {
+                // Cross-chunk movement
+                currentChunk.elements[currentPos.x, currentPos.y] = null;
+                targetChunk.elements[newPos.x, newPos.y] = this;
+                localPosition = newPos;
+                chunkPosition = newChunkPos;
+                targetChunk.isActive = true;
+                return true;
+            }
+        }
+    }
+
+    public abstract class SolidElement : Element
+    {
+        // specific for this element/particle type
+        public virtual float density => 2.0f; // Default density for powder particles
+        public virtual float sinkSpeed => 0.3f; // How fast the particle sinks in liquid
+        public virtual float diagonalSinkSpeed => 0.15f; // How likely to sink diagonally
+
+        //COLOR DATA
+        public override bool useCustomColorData => true;
+        public override Color[] colorData => new Color[]
+        {
+            new Color(0.94f, 0.85f, 0.53f), // Light Beige
+            new Color(0.87f, 0.76f, 0.46f), // Soft Yellow Sand
+            new Color(0.91f, 0.77f, 0.47f), // Light Brown Sand
+            new Color(0.81f, 0.67f, 0.35f), // Desert Sand
+            new Color(0.74f, 0.62f, 0.37f), // Medium Sand
+            new Color(0.85f, 0.72f, 0.48f), // Warm Sand
+            new Color(0.78f, 0.61f, 0.39f), // Brownish Sand
+            new Color(0.92f, 0.80f, 0.47f)  // Pale Sandy Yellow
+        };
+
+        public SolidElement(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos)
+        {
+
+        }
+
+        // overriden from the base Particle class
+        public override float maxVelocity => 5f;  // Maximum fall speed
+        public override float velocityAbsorption => 0.5f; // How much velocity is retained on impact (0-1)
+        public override float maxHorizontalVelocity => 3f; // Maximum horizontal speed
+        public override float horizontalDrag => 0.2f; // Base drag in air
+        public override float friction => 0.4f; // Additional slowdown when touching surfaces
+
+
+        private Vector2Int? lastPosition = null;
+        public Chunk currentChunkValue;
+
+        public override void Simulate(Chunk currentChunk)
+        {
+            
+        }
+
+        private Vector2Int[] GetPotentialMoves(Vector2Int current, bool isResting, float horizontalVelocity)
+        {
+            if (isResting)
+            {
+                return new Vector2Int[] { new Vector2Int(current.x, current.y - 1) };
+            }
+
+            int horizontalDir = horizontalVelocity > 0 ? 1 : -1;
+            if (Mathf.Abs(horizontalVelocity) < 0.1f) horizontalDir = 0;
+
+            if (horizontalDir == 0)
+            {
+                return Random.Range(0, 2) == 0 ?
+                    new Vector2Int[]
+                    {
+                    new Vector2Int(current.x, current.y - 1),
+                    new Vector2Int(current.x - 1, current.y - 1),
+                    new Vector2Int(current.x + 1, current.y - 1)
+                    } :
+                    new Vector2Int[]
+                    {
+                    new Vector2Int(current.x, current.y - 1),
+                    new Vector2Int(current.x + 1, current.y - 1),
+                    new Vector2Int(current.x - 1, current.y - 1)
+                    };
+            }
+
+            return Random.Range(0, 2) == 0 ?
+                new Vector2Int[]
+                {
+                new Vector2Int(current.x, current.y - 1),
+                new Vector2Int(current.x + horizontalDir, current.y - 1),
+                new Vector2Int(current.x + horizontalDir, current.y),
+                new Vector2Int(current.x - horizontalDir, current.y - 1)
+                } :
+                new Vector2Int[]
+                {
+                new Vector2Int(current.x + horizontalDir, current.y - 1),
+                new Vector2Int(current.x, current.y - 1),
+                new Vector2Int(current.x + horizontalDir, current.y),
+                new Vector2Int(current.x - horizontalDir, current.y - 1)
+                };
+        }
+
+        private void HandleCollision(bool hitObstacle)
+        {
+            if (hitObstacle && fallVelocity > 0.5f)
+            {
+                float impactForce = fallVelocity * velocityAbsorption;
+                horizontalVelocity = Random.Range(-1f, 1f) * impactForce;
+                horizontalVelocity = Mathf.Clamp(horizontalVelocity, -maxHorizontalVelocity, maxHorizontalVelocity);
+            }
+
+            fallVelocity = 0f;
+            isResting = (Mathf.Abs(horizontalVelocity) < 0.1f);
+        }
+
+        private void UpdateLastPosition(Chunk nextMoveChunk, Chunk currentChunk)
+        {
+            if (isSleeping)
+            {
+                nextMoveChunk.isActiveNextFrame = true;
+                //currentChunk.WakeUpAllChunkNeighbors(true);
+                currentChunk.WakeUpChunkNeighbors(localPosition, true);
+                if (lastPosition != null) currentChunk.WakeUpChunkNeighbors(lastPosition.Value, true);
             }
 
             if (lastPosition != null)
@@ -4389,6 +4813,34 @@ public class SandSimulation : MonoBehaviour
         }
     }
 
+    public class Bricks : SolidElement
+    {
+
+        private Color[] _customColorData;
+        public override Color[] colorData => _customColorData ?? new Color[]
+        {
+            new Color(0.35f, 0.2f, 0.3f, 1f), // grayish
+        };
+
+        // properties
+
+        public override bool useCustomColorData => true;
+        public override float density => 0.5f;
+
+        public Bricks(Vector2Int localPos, Vector2Int chunkPos) : base(localPos, chunkPos)
+        {
+            if (useCustomColorData && colorData != null && colorData.Length > 0)
+            {
+                this.localColor = colorData[Random.Range(0, colorData.Length - 1)];
+            }
+        }
+
+        public void SetCustomColorData(Color[] colors)
+        {
+            _customColorData = colors;
+        }
+    }
+
     public class SawDust : LightPowderElement
     {
         private Color[] _customColorData;
@@ -4839,6 +5291,7 @@ public static class ColorEdgeConnectionChecker
         var minX = int.MaxValue;
         var maxX = int.MinValue;
 
+        // First, find chunks containing the required colors and determine map bounds
         foreach (var kvp in chunks)
         {
             if (HasColoredElement(kvp.Value, requiredColors))
@@ -4851,7 +5304,7 @@ public static class ColorEdgeConnectionChecker
 
         if (relevantChunks.Count == 0) return false;
 
-        // Find starting points that match ANY of the required colors
+        // Find starting points on the LEFT edge only
         var startingPoints = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
         foreach (var chunkPos in relevantChunks.Where(c => c.x == minX))
         {
@@ -4868,22 +5321,17 @@ public static class ColorEdgeConnectionChecker
 
         if (startingPoints.Count == 0) return false;
 
-        var allConnectedElements = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
-
+        // For each starting point on the left edge, try to find a path to the right edge
         foreach (var start in startingPoints)
         {
             var visited = new HashSet<(Vector2Int chunkPos, Vector2Int localPos)>();
             if (PathExistsToRightEdge(start, chunks, maxX, visited, requiredColors, out var initialPath))
             {
+                // Only flood fill if we found a complete path from left to right
                 var connectedForThisPath = FloodFillFromPath(chunks, initialPath, requiredColors);
-                allConnectedElements.UnionWith(connectedForThisPath);
+                connectedElements = connectedForThisPath;
+                return true;
             }
-        }
-
-        if (allConnectedElements.Count > 0)
-        {
-            connectedElements = allConnectedElements;
-            return true;
         }
 
         return false;
@@ -5031,28 +5479,29 @@ public static class ColorEdgeConnectionChecker
             var (currentChunkPos, currentLocalPos) = queue.Dequeue();
             var currentChunk = chunks[currentChunkPos];
 
-            // Check if we reached the right edge
+            // Check if we've reached the right edge of the rightmost chunk
             if (currentChunkPos.x == maxX && currentLocalPos.x == currentChunk.chunkSize - 1)
             {
-                // Reconstruct the initial path
+                // Reconstruct the path
                 var pathPoint = (currentChunkPos, currentLocalPos);
                 while (pathParent.ContainsKey(pathPoint))
                 {
                     initialPath.Add(pathPoint);
                     pathPoint = pathParent[pathPoint];
                 }
-                initialPath.Add(current); // Add the starting point
+                initialPath.Add(current);
                 return true;
             }
 
+            // Prioritize horizontal movement to favor direct paths
             Vector2Int[] directions = new Vector2Int[]
             {
-                new Vector2Int(1, 0),   // right
-                new Vector2Int(-1, 0),  // left
-                new Vector2Int(0, 1),   // up
-                new Vector2Int(0, -1),  // down
+                new Vector2Int(1, 0),   // right (prioritized)
                 new Vector2Int(1, 1),   // up-right
                 new Vector2Int(1, -1),  // down-right
+                new Vector2Int(0, 1),   // up
+                new Vector2Int(0, -1),  // down
+                new Vector2Int(-1, 0),  // left
                 new Vector2Int(-1, 1),  // up-left
                 new Vector2Int(-1, -1), // down-left
             };

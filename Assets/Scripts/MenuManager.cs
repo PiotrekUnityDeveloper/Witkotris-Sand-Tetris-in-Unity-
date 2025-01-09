@@ -9,10 +9,12 @@ using UnityEngine.UI;
 
 public class MenuManager : MonoBehaviour
 {
+    public TMP_Text highscoretext;
+
     // Start is called before the first frame update
     void Start()
     {
-        
+        highscoretext.text = PlayerPrefs.GetInt("highscore", 0).ToString();
     }
 
     // Update is called once per frame
@@ -57,6 +59,23 @@ public class MenuManager : MonoBehaviour
         gamemodeButtonAnimator.SetTrigger("show");
         StartCoroutine(PauseUIAnimations());
         StartCoroutine(DisableUIObjectWithDelay(gamemodeListAnimator.gameObject));
+    }
+
+    public GameObject settingsWindow;
+
+    public void ToggleSettings()
+    {
+        settingsWindow.SetActive(!settingsWindow.activeInHierarchy);
+        Menu.SetActive(!Menu.activeInHierarchy);
+
+        if (settingsWindow.activeInHierarchy)
+        {
+            customMenu.SetActive(false);
+        }
+        else
+        {
+            customMenu.SetActive(false);
+        }
     }
 
     public void SelectGamemode(GameObject gmButton)
@@ -206,12 +225,14 @@ public class MenuManager : MonoBehaviour
     {
         tileselect.SetActive(false);
         Menu.SetActive(true);
+        customMenu.SetActive(false);
     }
 
     public void GoToTilePatternSelect()
     {
         tileselect.SetActive(true);
         Menu.SetActive(false);
+        customMenu.SetActive(false);
     }
 
     private WitkotrisDifficulty witkotrisDifficulty;
@@ -229,6 +250,9 @@ public class MenuManager : MonoBehaviour
     public List<Sprite> defaultfoursprites = new List<Sprite>();
     public List<Sprite> defaulttwosprites = new List<Sprite>();
     public List<Sprite> default32sprites = new List<Sprite>();
+
+    public List<Sprite> extraShapes = new List<Sprite>();
+
     public int chunkSize = 8;
 
     public TMP_Text difficultyInfoText;
@@ -413,7 +437,7 @@ public class MenuManager : MonoBehaviour
 
                 difficultyInfoText.text = "Slow speed. 4 types of elements";
             }
-            else if (witkotrisDifficulty == WitkotrisDifficulty.MEDIUM || witkotrisDifficulty == WitkotrisDifficulty.HARD)
+            else if (witkotrisDifficulty == WitkotrisDifficulty.MEDIUM)
             {
                 SettingsSaver.defaultSpeed = 2;
                 SettingsSaver.fastForwardSpeed = 6;
@@ -426,9 +450,36 @@ public class MenuManager : MonoBehaviour
                 this.elementTypes.Add("water");
                 this.elementTypes.Add("sawdust");
                 this.elementTypes.Add("flour");
+                this.elementTypes.Add("bricks");
                 // TODO ADD SOME ELEMENTS MATE
 
-                difficultyInfoText.text = "Tiles go faster, 5 elements";
+                SettingsSaver.tiles.AddRange(extraShapes);
+
+                //SettingsSaver.checkColorsOnly = false;
+
+                difficultyInfoText.text = "Tiles go faster, 5 elements, and a few extra shapes";
+            }
+            else if (witkotrisDifficulty == WitkotrisDifficulty.HARD)
+            {
+                SettingsSaver.defaultSpeed = 2;
+                SettingsSaver.fastForwardSpeed = 6;
+                SettingsSaver.horizontalSpeed = 2;
+
+                //SettingsSaver.checkColorsOnly = true;
+
+                this.elementTypes.Clear();
+                this.elementTypes.Add("sand");
+                this.elementTypes.Add("water");
+                this.elementTypes.Add("sawdust");
+                this.elementTypes.Add("flour");
+                this.elementTypes.Add("bricks");
+                // TODO ADD SOME ELEMENTS MATE
+
+                SettingsSaver.tiles.AddRange(extraShapes);
+
+                SettingsSaver.checkColorsOnly = false;
+
+                difficultyInfoText.text = "Tiles go even faster, 5 elements, extra shapes, and only the same element types can clear a line";
             }
             /// TODO ADD CUSTOM GAMEMODE
 
@@ -437,6 +488,101 @@ public class MenuManager : MonoBehaviour
             this.colors.Add(new Color(1, 0.3254717f, 0.3254717f, 1)); // red
             this.colors.Add(new Color(0.9761904f, 1, 0, 1)); // yellow
             this.colors.Add(new Color(0, 0.745283f, 0.1789982f, 1)); // green
+        }else if(witkotrisGamemode == WitkotrisGamemode.CUSTOM)
+        {
+            SettingsSaver.horizontalSpeed = (int)horizSpeed.value;
+            SettingsSaver.defaultSpeed = (int)fallSpeed.value;
+            SettingsSaver.fastForwardSpeed = (int)ffSpeed.value;
+
+            if (usepowder.isOn)
+            {
+                SettingsSaver.elements.Add("sand");
+            }
+
+            if (uselightpowder.isOn)
+            {
+                SettingsSaver.elements.Add("sawdust");
+            }
+
+            if (usedust.isOn)
+            {
+                SettingsSaver.elements.Add("flour");
+            }
+
+            if (useliquid.isOn)
+            {
+                SettingsSaver.elements.Add("water");
+            }
+
+            if (usesolid.isOn)
+            {
+                SettingsSaver.elements.Add("bricks");
+            }
+
+            //colors
+
+            this.colors.Clear();
+            
+            
+
+            if (useyellow.isOn)
+            {
+                this.colors.Add(new Color(0.9761904f, 1, 0, 1)); // yellow
+            }
+
+            if (usegreen.isOn)
+            {
+                this.colors.Add(new Color(0, 0.745283f, 0.1789982f, 1)); // green
+            }
+
+            if (usered.isOn)
+            {
+                this.colors.Add(new Color(1, 0.3254717f, 0.3254717f, 1)); // red
+            }
+
+            if (useblue.isOn)
+            {
+                this.colors.Add(new Color(0.2877358f, 0.5475029f, 1, 1)); // blue
+            }
+
+            if (useorange.isOn)
+            {
+                this.colors.Add(orange);
+            }
+
+            if (usewhite.isOn)
+            {
+                this.colors.Add(Color.white);
+            }
+
+            if (usegray .isOn)
+            {
+                this.colors.Add(gray);
+            }
+
+            if (usepink.isOn)
+            {
+                this.colors.Add(pink);
+            }
+
+            if(colors.Count <= 0)
+            {
+                this.colors.Add(Color.black);
+            }
+
+            if (useextraShapes.isOn)
+            {
+                SettingsSaver.tiles.AddRange(extraShapes);
+            }
+
+            if (impossile.isOn)
+            {
+                SettingsSaver.checkColorsOnly = true;
+            }
+            else
+            {
+                SettingsSaver.checkColorsOnly = false;
+            }
         }
 
         SettingsSaver.elements = this.elementTypes;
@@ -444,6 +590,72 @@ public class MenuManager : MonoBehaviour
         SettingsSaver.colors = this.colors;
         SettingsSaver.chunkSize = this.chunkSize;
     }
+
+    public Toggle impossile;
+
+    public GameObject customMenu;
+    public void CustomGamemodeToggle()
+    {
+        customMenu.SetActive(!customMenu.activeInHierarchy);
+
+        if (customMenu.activeInHierarchy)
+        {
+            settingsWindow.SetActive(false);
+            Menu.SetActive(false);
+        }
+        else
+        {
+            settingsWindow.SetActive(false);
+            Menu.SetActive(true);
+        }
+    }
+
+    public void SetAsCustom()
+    {
+        this.selectedGamemode = WitkotrisGamemode.CUSTOM;
+        gamemodeButtonText.text = "CUSTOM";
+    }
+
+    public void ShowCustom()
+    {
+        if (customMenu.activeInHierarchy)
+        {
+            settingsWindow.SetActive(false);
+            Menu.SetActive(true);
+            customMenu.SetActive(false);
+        }
+        else
+        {
+            settingsWindow.SetActive(false);
+            Menu.SetActive(false);
+            customMenu.SetActive(true);
+        }
+    }
+
+    public Toggle usepowder;
+    public Toggle uselightpowder;
+    public Toggle usedust;
+    public Toggle useliquid;
+    public Toggle usesolid;
+
+    public Toggle useextraShapes;
+
+    public Toggle useyellow;
+    public Toggle usegreen;
+    public Toggle useblue;
+    public Toggle usered;
+    public Toggle usepink;
+    public Toggle usegray;
+    public Toggle usewhite;
+    public Toggle useorange;
+
+    public Color orange;
+    public Color gray;
+    public Color pink;
+
+    public Slider horizSpeed;
+    public Slider fallSpeed;
+    public Slider ffSpeed;
 
     public Animator menuAnimator;
     public Animator mobileControlsAnimator;

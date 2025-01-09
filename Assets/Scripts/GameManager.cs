@@ -78,12 +78,57 @@ public class GameManager : MonoBehaviour
         highScoreTime = SettingsSaver.highscoretime;
     }
 
+    public TMP_Text extraText;
+
     public void StartGame()
     {
         if(tileSpawnpoint != null)
         {
             simulation.CreateSimObject(tileSpawnpoint.position, GetRandomTileSprite(), GetRandomTileColor(), GetRandomElementType());
         }else { Debug.Log("tileSpawnpoint is null, please assign it so tiles have a place to spawn..."); }
+
+        if(gamemode == WitkotrisGamemode.HIGHSCORE)
+        {
+            timeCount = SettingsSaver.highscoretime;
+            extraText.text = timeCount.ToString() + " seconds left";
+            StartCoroutine(countdownTime());
+        }
+        else if(gamemode == WitkotrisGamemode.CLEAR)
+        {
+            clearCount = SettingsSaver.clearAmount;
+            extraText.text = SettingsSaver.clearAmount + "/" + clearCount + " clears left";
+        }
+    }
+
+    public void CountClear()
+    {
+        if(gamemode == WitkotrisGamemode.CLEAR)
+        {
+            clearCount -= 1;
+
+            if (clearCount <= 0)
+            {
+                Gameover();
+            }
+        }
+    }
+
+    private int clearCount;
+    private int timeCount;
+    public IEnumerator countdownTime()
+    {
+        yield return new WaitForSeconds(1f);
+        timeCount -= 1;
+        extraText.text = timeCount.ToString();
+
+        if(timeCount <= 0)
+        {
+            Gameover();
+        }
+        else
+        {
+            StartCoroutine(countdownTime());
+        }
     }
 
     public IEnumerator DelayGameStart()
@@ -186,6 +231,11 @@ public class GameManager : MonoBehaviour
     {
         totalScore += scoreNum;
         totalScoreText.text = totalScore.ToString();
+
+        if(totalScore > PlayerPrefs.GetInt("highscore", 0))
+        {
+            PlayerPrefs.SetInt("highscore", totalScore);
+        }
     }
 
     
