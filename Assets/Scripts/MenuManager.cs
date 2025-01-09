@@ -195,6 +195,25 @@ public class MenuManager : MonoBehaviour
         }
     }
 
+    public void SetTilePattern(string style)
+    {
+        this.selectedTileStyle = style;
+    }
+
+    public GameObject Menu;
+    public GameObject tileselect;
+    public void GoToMenu()
+    {
+        tileselect.SetActive(false);
+        Menu.SetActive(true);
+    }
+
+    public void GoToTilePatternSelect()
+    {
+        tileselect.SetActive(true);
+        Menu.SetActive(false);
+    }
+
     private WitkotrisDifficulty witkotrisDifficulty;
     private WitkotrisGamemode witkotrisGamemode;
 
@@ -206,10 +225,10 @@ public class MenuManager : MonoBehaviour
     public List<Sprite> fancyeightsprites = new List<Sprite>();
     //16
     public List<Sprite> defaultsixteensprites = new List<Sprite>();
-    public List<Sprite> fancysixteensprites = new List<Sprite>();
     //4
     public List<Sprite> defaultfoursprites = new List<Sprite>();
-    public List<Sprite> fancyfoursprites = new List<Sprite>();
+    public List<Sprite> defaulttwosprites = new List<Sprite>();
+    public List<Sprite> default32sprites = new List<Sprite>();
     public int chunkSize = 8;
 
     public TMP_Text difficultyInfoText;
@@ -241,20 +260,20 @@ public class MenuManager : MonoBehaviour
             SettingsSaver.tiles = new List<Sprite>(this.defaultsixteensprites);
             SettingsSaver.chunkSize = 16;
         }
-        else if (selectedTileStyle == "fancy16")
+        else if (selectedTileStyle == "default2")
         {
-            SettingsSaver.tiles = new List<Sprite>(this.fancysixteensprites);
-            SettingsSaver.chunkSize = 16;
+            SettingsSaver.tiles = new List<Sprite>(this.defaulttwosprites);
+            SettingsSaver.chunkSize = 2;
         }
         else if (selectedTileStyle == "default4")
         {
             SettingsSaver.tiles = new List<Sprite>(this.defaultfoursprites);
             SettingsSaver.chunkSize = 4;
         }
-        else if (selectedTileStyle == "fancy4")
+        else if (selectedTileStyle == "default32")
         {
-            SettingsSaver.tiles = new List<Sprite>(this.fancyfoursprites);
-            SettingsSaver.chunkSize = 4;
+            SettingsSaver.tiles = new List<Sprite>(this.default32sprites);
+            SettingsSaver.chunkSize = 32;
         }
 
         if (witkotrisGamemode == WitkotrisGamemode.DEFAULT)

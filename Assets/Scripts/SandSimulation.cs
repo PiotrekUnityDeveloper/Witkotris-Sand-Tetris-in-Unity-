@@ -69,7 +69,7 @@ public class SandSimulation : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        //this.chunkSize = SettingsSaver.chunkSize;
+        this.chunkSize = SettingsSaver.chunkSize;
     }
 
     void Start()
@@ -534,6 +534,7 @@ public class SandSimulation : MonoBehaviour
         }
 
         simulationRenderer.enabled = true;
+        simulationRenderer.InitAll();
     }
 
     public void UpdateChunks()
@@ -859,12 +860,6 @@ public class SandSimulation : MonoBehaviour
     public IEnumerator GameoverScreen()
     {
         foreach(Chunk ch in this.chunks.Values)
-        {
-            yield return new WaitForSecondsRealtime(0.000001f);
-            EvacuateChunk(ch.chunkPosition);
-        }
-
-        foreach (Chunk ch in this.chunks.Values)
         {
             yield return new WaitForSecondsRealtime(0.000001f);
             EvacuateChunk(ch.chunkPosition);

@@ -17,7 +17,7 @@ public class SimulationRenderer : MonoBehaviour
     void Start()
     {
         //Invoke("InitAll", 1f);
-        InitAll();
+        //InitAll();
     }
 
     public void InitAll()
