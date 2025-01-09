@@ -69,7 +69,7 @@ public class SandSimulation : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        this.chunkSize = SettingsSaver.chunkSize;
+        //this.chunkSize = SettingsSaver.chunkSize;
     }
 
     void Start()
