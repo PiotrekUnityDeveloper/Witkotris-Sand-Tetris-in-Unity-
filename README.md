@@ -2,6 +2,14 @@
 sand
 <hr>
 
+preview images (from itch):
+https://img.itch.zone/aW1hZ2UvMzMyNDM0My8xOTg0OTg5OS5wbmc=/original/6Pryqm.png
+https://img.itch.zone/aW1hZ2UvMzMyNDM0My8xOTg0OTg5OC5wbmc=/original/etJLPe.png
+https://img.itch.zone/aW1hZ2UvMzMyNDM0My8xOTg0OTg5Ny5wbmc=/original/4DvVKj.png
+
+you can also download the builds on itch:
+https://piotrek4.itch.io/witkopiasek
+
 broken as fuck but the main mechanic works
 
 android 12+ older versions may not work
